@@ -1,5 +1,13 @@
 package com.parkingsolvers.smartpark.dashboard.ui
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -131,6 +139,11 @@ fun DashboardScreen(
             val servidoresNoPatio = (dashboard.veiculosNoCampusAgora - dashboard.visitantesNoCampusAgora).coerceAtLeast(0)
 
             item {
+                val progressoGeral by animateFloatAsState(
+                    targetValue = dashboard.percentualOcupacaoAtual,
+                    animationSpec = tween(450, easing = FastOutSlowInEasing),
+                    label = "progresso_geral_admin"
+                )
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(14.dp),
@@ -147,7 +160,7 @@ fun DashboardScreen(
                         ) {
                             Column {
                                 Text(
-                                    text = "Veículos no pátio agora",
+                                    text = "Veículos no pátio agora (${dashboard.vagasLivresAgora} livres)",
                                     style = MaterialTheme.typography.labelMedium,
                                     color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.85f)
                                 )
@@ -165,7 +178,7 @@ fun DashboardScreen(
                         }
 
                         LinearProgressIndicator(
-                            progress = { dashboard.percentualOcupacaoAtual },
+                            progress = { progressoGeral },
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(6.dp),
@@ -185,6 +198,11 @@ fun DashboardScreen(
             item {
                 val lotadoEletrico = dashboard.capacidadeCarregamentoEletrico > 0 &&
                     dashboard.vagasEletricasOcupadasAgora >= dashboard.capacidadeCarregamentoEletrico
+                val progressoEletrico by animateFloatAsState(
+                    targetValue = dashboard.percentualEletricasAtual,
+                    animationSpec = tween(450, easing = FastOutSlowInEasing),
+                    label = "progresso_eletrico_admin"
+                )
                 SmartParkCard(
                     modifier = Modifier.fillMaxWidth(),
                     borderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)
@@ -212,7 +230,7 @@ fun DashboardScreen(
                                 )
                             }
                             StatusBadge(
-                                texto = if (lotadoEletrico) "Lotado" else "Disponível",
+                                texto = if (lotadoEletrico) "Lotado" else "${dashboard.vagasEletricasLivresAgora} livre(s)",
                                 tone = if (lotadoEletrico) BadgeTone.ALERTA else BadgeTone.SUCESSO
                             )
                         }
@@ -235,7 +253,7 @@ fun DashboardScreen(
                         }
 
                         LinearProgressIndicator(
-                            progress = { dashboard.percentualEletricasAtual },
+                            progress = { progressoEletrico },
                             modifier = Modifier.fillMaxWidth()
                         )
 
@@ -273,7 +291,7 @@ fun DashboardScreen(
                     MetricaCard(
                         titulo = "Vagas exclusivas",
                         valor = "${dashboard.vagasExclusivasOcupadasAgora}/${dashboard.capacidadeExclusivas}",
-                        subtitulo = "${(dashboard.percentualExclusivasAtual * 100).toInt()}% em uso agora",
+                        subtitulo = "${dashboard.vagasExclusivasLivresAgora} livres agora",
                         modifier = Modifier.weight(1f)
                     )
                     MetricaCard(
@@ -322,6 +340,11 @@ fun DashboardScreen(
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         dashboard.ocupacaoPorTurno.forEach { item ->
+                            val progressoTurno by animateFloatAsState(
+                                targetValue = item.percentualLotacao,
+                                animationSpec = tween(420, easing = FastOutSlowInEasing),
+                                label = "turno_${item.turno.name}"
+                            )
                             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
@@ -340,7 +363,7 @@ fun DashboardScreen(
                                     )
                                 }
                                 LinearProgressIndicator(
-                                    progress = { item.percentualLotacao },
+                                    progress = { progressoTurno },
                                     modifier = Modifier.fillMaxWidth()
                                 )
                             }

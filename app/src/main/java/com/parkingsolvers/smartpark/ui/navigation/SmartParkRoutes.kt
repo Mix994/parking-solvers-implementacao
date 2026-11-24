@@ -4,6 +4,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Badge
 import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.DirectionsCar
+import androidx.compose.material.icons.filled.LocalParking
 import androidx.compose.material.icons.filled.ManageAccounts
 import androidx.compose.material.icons.filled.VerifiedUser
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -15,6 +16,12 @@ enum class AbaNavegacao(
     val icone: ImageVector,
     val perfisPermitidos: Set<PerfilUsuario>
 ) {
+    VAGAS(
+        rota = "vagas",
+        label = "Vagas",
+        icone = Icons.Default.LocalParking,
+        perfisPermitidos = setOf(PerfilUsuario.SERVIDOR)
+    ),
     DASHBOARD(
         rota = "dashboard",
         label = "Painel",
@@ -53,7 +60,7 @@ enum class AbaNavegacao(
         fun rotaInicial(perfil: PerfilUsuario): String = when (perfil) {
             PerfilUsuario.ADMIN -> DASHBOARD.rota
             PerfilUsuario.PORTARIA -> PORTARIA.rota
-            PerfilUsuario.SERVIDOR -> VEICULOS.rota
+            PerfilUsuario.SERVIDOR -> VAGAS.rota
         }
     }
 }

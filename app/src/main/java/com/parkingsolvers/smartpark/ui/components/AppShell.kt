@@ -1,5 +1,13 @@
 package com.parkingsolvers.smartpark.ui.components
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -37,6 +45,7 @@ import com.parkingsolvers.smartpark.auth.model.PerfilUsuario
 import com.parkingsolvers.smartpark.auth.model.UsuarioSessao
 import com.parkingsolvers.smartpark.dashboard.ui.DashboardScreen
 import com.parkingsolvers.smartpark.dashboard.ui.DashboardViewModel
+import com.parkingsolvers.smartpark.dashboard.ui.VagasDisponiveisScreen
 import com.parkingsolvers.smartpark.movimentacao.ui.PortariaScreen
 import com.parkingsolvers.smartpark.movimentacao.ui.PortariaViewModel
 import com.parkingsolvers.smartpark.servidor.ui.ServidorViewModel
@@ -134,8 +143,32 @@ fun AppShell(
         ) {
             NavHost(
                 navController = navController,
-                startDestination = AbaNavegacao.rotaInicial(sessao.perfil)
+                startDestination = AbaNavegacao.rotaInicial(sessao.perfil),
+                enterTransition = {
+                    fadeIn(tween(240, easing = FastOutSlowInEasing)) +
+                        slideInHorizontally(tween(240, easing = FastOutSlowInEasing)) { it / 18 }
+                },
+                exitTransition = {
+                    fadeOut(tween(180, easing = FastOutSlowInEasing))
+                },
+                popEnterTransition = {
+                    fadeIn(tween(240, easing = FastOutSlowInEasing)) +
+                        slideInHorizontally(tween(240, easing = FastOutSlowInEasing)) { -it / 18 }
+                },
+                popExitTransition = {
+                    fadeOut(tween(180, easing = FastOutSlowInEasing))
+                }
             ) {
+                composable(AbaNavegacao.VAGAS.rota) {
+                    val vm: DashboardViewModel = viewModel(
+                        factory = DashboardViewModel.factory(
+                            dashboardService = container.dashboardService,
+                            configuracaoService = container.configuracaoEstacionamentoService
+                        )
+                    )
+                    VagasDisponiveisScreen(viewModel = vm)
+                }
+
                 composable(AbaNavegacao.DASHBOARD.rota) {
                     val vm: DashboardViewModel = viewModel(
                         factory = DashboardViewModel.factory(
@@ -244,8 +277,21 @@ private fun GestaoAdminScreen(
             }
         }
 
-        Box(modifier = Modifier.weight(1f)) {
-            if (abaSelecionada == 0) {
+        AnimatedContent(
+            targetState = abaSelecionada,
+            modifier = Modifier.weight(1f),
+            transitionSpec = {
+                val direcao = if (targetState > initialState) 1 else -1
+                (fadeIn(tween(220, easing = FastOutSlowInEasing)) +
+                    slideInHorizontally(tween(220, easing = FastOutSlowInEasing)) { direcao * (it / 12) })
+                    .togetherWith(
+                        fadeOut(tween(160, easing = FastOutSlowInEasing)) +
+                            slideOutHorizontally(tween(160)) { -direcao * (it / 12) }
+                    )
+            },
+            label = "gestao_tabs"
+        ) { aba ->
+            if (aba == 0) {
                 val servidorVm: ServidorViewModel = viewModel(
                     factory = ServidorViewModel.factory(container.servidorService)
                 )

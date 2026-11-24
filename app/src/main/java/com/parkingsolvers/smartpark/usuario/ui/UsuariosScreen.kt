@@ -147,7 +147,8 @@ fun UsuariosScreen(
                     UsuarioCard(
                         usuario = usuario,
                         ehContaAtual = usuario.id == usuarioLogadoId,
-                        onAlternarAtivo = { viewModel.alternarAtivo(usuario.id, usuarioLogadoId) }
+                        onAlternarAtivo = { viewModel.alternarAtivo(usuario.id, usuarioLogadoId) },
+                        modifier = Modifier.animateItem()
                     )
                 }
             }
@@ -175,7 +176,8 @@ fun UsuariosScreen(
 private fun UsuarioCard(
     usuario: UsuarioResponse,
     ehContaAtual: Boolean,
-    onAlternarAtivo: () -> Unit
+    onAlternarAtivo: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     val perfilTone = when (usuario.perfil) {
         PerfilUsuario.ADMIN -> BadgeTone.INFO
@@ -183,7 +185,7 @@ private fun UsuarioCard(
         PerfilUsuario.SERVIDOR -> BadgeTone.ALERTA
     }
 
-    SmartParkCard(modifier = Modifier.fillMaxWidth()) {
+    SmartParkCard(modifier = modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier.padding(14.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp)

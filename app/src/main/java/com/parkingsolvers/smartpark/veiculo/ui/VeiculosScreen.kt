@@ -106,7 +106,8 @@ fun VeiculosScreen(
                 items(veiculos, key = { it.id }) { veiculo ->
                     VeiculoCard(
                         veiculo = veiculo,
-                        onAlternarAtivo = { viewModel.alternarAtivo(veiculo.id) }
+                        onAlternarAtivo = { viewModel.alternarAtivo(veiculo.id) },
+                        modifier = Modifier.animateItem()
                     )
                 }
             }
@@ -134,9 +135,10 @@ fun VeiculosScreen(
 @Composable
 private fun VeiculoCard(
     veiculo: VeiculoResponse,
-    onAlternarAtivo: () -> Unit
+    onAlternarAtivo: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
-    SmartParkCard(modifier = Modifier.fillMaxWidth()) {
+    SmartParkCard(modifier = modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier.padding(14.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)

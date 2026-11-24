@@ -36,4 +36,25 @@ data class DashboardOcupacaoResponse(
     val diasComMovimento: Int,
     val ocupacaoPorTurno: List<OcupacaoPorTurnoItem>,
     val usoPorTipoVaga: List<UsoVagaItem>
-)
+) {
+    val capacidadeComuns: Int
+        get() = (capacidadeTotal - capacidadeExclusivas - capacidadeCarregamentoEletrico).coerceAtLeast(0)
+
+    val vagasComunsOcupadasAgora: Int
+        get() = (veiculosNoCampusAgora - vagasExclusivasOcupadasAgora - vagasEletricasOcupadasAgora).coerceAtLeast(0)
+
+    val vagasLivresAgora: Int
+        get() = (capacidadeTotal - veiculosNoCampusAgora).coerceAtLeast(0)
+
+    val vagasComunsLivresAgora: Int
+        get() = (capacidadeComuns - vagasComunsOcupadasAgora).coerceAtLeast(0)
+
+    val vagasExclusivasLivresAgora: Int
+        get() = (capacidadeExclusivas - vagasExclusivasOcupadasAgora).coerceAtLeast(0)
+
+    val vagasEletricasLivresAgora: Int
+        get() = (capacidadeCarregamentoEletrico - vagasEletricasOcupadasAgora).coerceAtLeast(0)
+
+    val percentualComunsAtual: Float
+        get() = if (capacidadeComuns <= 0) 0f else (vagasComunsOcupadasAgora.toFloat() / capacidadeComuns.toFloat()).coerceIn(0f, 1f)
+}

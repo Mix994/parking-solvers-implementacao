@@ -4,6 +4,13 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.togetherWith
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -24,22 +31,31 @@ class MainActivity : ComponentActivity() {
             ParkingSolversTheme {
                 val sessao by container.authService.sessaoAtual.collectAsState()
 
-                val usuarioLogado = sessao
-                if (usuarioLogado == null) {
-                    val loginViewModel: LoginViewModel = viewModel(
-                        factory = LoginViewModel.factory(
-                            authService = container.authService,
-                            usuarioService = container.usuarioService,
-                            servidorService = container.servidorService
+                AnimatedContent(
+                    targetState = sessao,
+                    transitionSpec = {
+                        (fadeIn(tween(280, easing = FastOutSlowInEasing)) +
+                            scaleIn(tween(280, easing = FastOutSlowInEasing), initialScale = 0.98f))
+                            .togetherWith(fadeOut(tween(180, easing = FastOutSlowInEasing)))
+                    },
+                    label = "transicao_sessao"
+                ) { usuarioLogado ->
+                    if (usuarioLogado == null) {
+                        val loginViewModel: LoginViewModel = viewModel(
+                            factory = LoginViewModel.factory(
+                                authService = container.authService,
+                                usuarioService = container.usuarioService,
+                                servidorService = container.servidorService
+                            )
                         )
-                    )
-                    LoginScreen(viewModel = loginViewModel)
-                } else {
-                    AppShell(
-                        sessao = usuarioLogado,
-                        container = container,
-                        onSair = { container.authService.sair() }
-                    )
+                        LoginScreen(viewModel = loginViewModel)
+                    } else {
+                        AppShell(
+                            sessao = usuarioLogado,
+                            container = container,
+                            onSair = { container.authService.sair() }
+                        )
+                    }
                 }
             }
         }

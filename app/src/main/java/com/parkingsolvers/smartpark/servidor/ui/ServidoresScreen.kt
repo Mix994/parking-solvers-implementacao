@@ -103,7 +103,8 @@ fun ServidoresScreen(
                 items(servidores, key = { it.id }) { servidor ->
                     ServidorCard(
                         servidor = servidor,
-                        onAlternarAtivo = { viewModel.alternarAtivo(servidor.id) }
+                        onAlternarAtivo = { viewModel.alternarAtivo(servidor.id) },
+                        modifier = Modifier.animateItem()
                     )
                 }
             }
@@ -129,9 +130,10 @@ fun ServidoresScreen(
 @Composable
 private fun ServidorCard(
     servidor: ServidorResponse,
-    onAlternarAtivo: () -> Unit
+    onAlternarAtivo: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
-    SmartParkCard(modifier = Modifier.fillMaxWidth()) {
+    SmartParkCard(modifier = modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier.padding(14.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp)

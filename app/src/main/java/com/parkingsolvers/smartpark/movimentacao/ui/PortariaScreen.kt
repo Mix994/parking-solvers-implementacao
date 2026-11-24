@@ -1,5 +1,12 @@
 package com.parkingsolvers.smartpark.movimentacao.ui
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -154,18 +161,25 @@ fun PortariaScreen(
             }
         }
 
-        uiState.resultadoConsulta?.let { resultado ->
-            val movimentacaoAberta = noEstacionamento.firstOrNull { it.placa == resultado.placaConsultada }
-            item {
-                ResultadoConsultaCard(
-                    resultado = resultado,
-                    movimentacaoAberta = movimentacaoAberta,
-                    onRegistrarEntrada = { permitirAvulso ->
-                        viewModel.registrarEntrada(permitirNaoAutorizado = permitirAvulso)
-                    },
-                    onRegistrarSaida = { id -> viewModel.registrarSaida(id) },
-                    onCadastrarVisitante = { onRegistrarComoVisitante(resultado.placaConsultada) }
-                )
+        item(key = "resultado_consulta") {
+            val resultado = uiState.resultadoConsulta
+            AnimatedVisibility(
+                visible = resultado != null,
+                enter = fadeIn(tween(240, easing = FastOutSlowInEasing)) + expandVertically(tween(260)),
+                exit = fadeOut(tween(160)) + shrinkVertically(tween(200))
+            ) {
+                if (resultado != null) {
+                    val movimentacaoAberta = noEstacionamento.firstOrNull { it.placa == resultado.placaConsultada }
+                    ResultadoConsultaCard(
+                        resultado = resultado,
+                        movimentacaoAberta = movimentacaoAberta,
+                        onRegistrarEntrada = { permitirAvulso ->
+                            viewModel.registrarEntrada(permitirNaoAutorizado = permitirAvulso)
+                        },
+                        onRegistrarSaida = { id -> viewModel.registrarSaida(id) },
+                        onCadastrarVisitante = { onRegistrarComoVisitante(resultado.placaConsultada) }
+                    )
+                }
             }
         }
 
@@ -189,7 +203,8 @@ fun PortariaScreen(
             items(noEstacionamento, key = { it.id }) { mov ->
                 MovimentacaoAtivaCard(
                     movimentacao = mov,
-                    onRegistrarSaida = { viewModel.registrarSaida(mov.id) }
+                    onRegistrarSaida = { viewModel.registrarSaida(mov.id) },
+                    modifier = Modifier.animateItem()
                 )
             }
         }
@@ -212,7 +227,7 @@ fun PortariaScreen(
             }
         } else {
             items(ultimasSaidas, key = { "saida_${it.id}" }) { mov ->
-                HistoricoItem(movimentacao = mov)
+                HistoricoItem(movimentacao = mov, modifier = Modifier.animateItem())
             }
         }
 
@@ -221,9 +236,12 @@ fun PortariaScreen(
 }
 
 @Composable
-private fun HistoricoItem(movimentacao: MovimentacaoResponse) {
+private fun HistoricoItem(
+    movimentacao: MovimentacaoResponse,
+    modifier: Modifier = Modifier
+) {
     SmartParkCard(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
     ) {
         Row(
@@ -353,9 +371,10 @@ private fun ResultadoConsultaCard(
 @Composable
 private fun MovimentacaoAtivaCard(
     movimentacao: MovimentacaoResponse,
-    onRegistrarSaida: () -> Unit
+    onRegistrarSaida: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
-    SmartParkCard(modifier = Modifier.fillMaxWidth()) {
+    SmartParkCard(modifier = modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier.padding(14.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)

@@ -164,7 +164,8 @@ fun VisitantesScreen(
                 items(noCampusFiltrados, key = { it.id }) { visitante ->
                     VisitanteAtivoCard(
                         visitante = visitante,
-                        onRegistrarSaida = { viewModel.registrarSaida(visitante.id) }
+                        onRegistrarSaida = { viewModel.registrarSaida(visitante.id) },
+                        modifier = Modifier.animateItem()
                     )
                 }
             }
@@ -187,7 +188,7 @@ fun VisitantesScreen(
                 }
             } else {
                 items(encerradosFiltrados, key = { "hist_${it.id}" }) { visitante ->
-                    VisitanteHistoricoItem(visitante = visitante)
+                    VisitanteHistoricoItem(visitante = visitante, modifier = Modifier.animateItem())
                 }
             }
 
@@ -221,9 +222,10 @@ private fun combinaBusca(visitante: VisitanteResponse, termo: String): Boolean {
 @Composable
 private fun VisitanteAtivoCard(
     visitante: VisitanteResponse,
-    onRegistrarSaida: () -> Unit
+    onRegistrarSaida: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
-    SmartParkCard(modifier = Modifier.fillMaxWidth()) {
+    SmartParkCard(modifier = modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier.padding(14.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -292,9 +294,12 @@ private fun VisitanteAtivoCard(
 }
 
 @Composable
-private fun VisitanteHistoricoItem(visitante: VisitanteResponse) {
+private fun VisitanteHistoricoItem(
+    visitante: VisitanteResponse,
+    modifier: Modifier = Modifier
+) {
     SmartParkCard(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
     ) {
         Row(

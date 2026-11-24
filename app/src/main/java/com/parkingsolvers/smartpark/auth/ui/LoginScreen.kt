@@ -1,5 +1,8 @@
 package com.parkingsolvers.smartpark.auth.ui
 
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -120,6 +123,7 @@ fun LoginScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .animateContentSize(tween(240, easing = FastOutSlowInEasing))
                         .padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
@@ -334,7 +338,9 @@ private fun NovaContaDialog(
         title = { Text("Criar nova conta") },
         text = {
             Column(
-                modifier = Modifier.verticalScroll(rememberScrollState()),
+                modifier = Modifier
+                    .verticalScroll(rememberScrollState())
+                    .animateContentSize(tween(240, easing = FastOutSlowInEasing)),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Text("Nível de acesso:", style = MaterialTheme.typography.labelMedium)
