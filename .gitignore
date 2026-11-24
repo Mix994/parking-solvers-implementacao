@@ -1,0 +1,20 @@
+# Android Studio / Gradle
+*.iml
+.gradle/
+**/build/
+local.properties
+.idea/
+.kotlin/
+captures/
+.externalNativeBuild/
+.cxx/
+
+# Compilados e logs
+*.class
+*.log
+hs_err_pid*
+replay_pid*
+
+# Sistema operacional
+.DS_Store
+Thumbs.db
