@@ -3,10 +3,13 @@ package com.parkingsolvers.smartpark
 import android.app.Application
 import com.parkingsolvers.smartpark.auth.service.AuthService
 import com.parkingsolvers.smartpark.auth.service.LoginAttemptService
+import com.parkingsolvers.smartpark.dashboard.repository.ConfiguracaoEstacionamentoRepository
 import com.parkingsolvers.smartpark.dashboard.service.CalculadoraOcupacao
+import com.parkingsolvers.smartpark.dashboard.service.ConfiguracaoEstacionamentoService
 import com.parkingsolvers.smartpark.dashboard.service.DashboardService
 import com.parkingsolvers.smartpark.database.SmartParkDatabase
 import com.parkingsolvers.smartpark.dev.DadosIniciais
+import com.parkingsolvers.smartpark.movimentacao.model.TipoVaga
 import com.parkingsolvers.smartpark.movimentacao.repository.MovimentacaoRepository
 import com.parkingsolvers.smartpark.movimentacao.service.MovimentacaoService
 import com.parkingsolvers.smartpark.servidor.repository.ServidorRepository
@@ -35,6 +38,8 @@ class AppContainer(application: Application) {
     val veiculoRepository = VeiculoRepository(database.veiculoDao())
     val movimentacaoRepository = MovimentacaoRepository(database.movimentacaoDao())
     val visitanteRepository = VisitanteRepository(database.visitanteDao())
+    val configuracaoEstacionamentoRepository =
+        ConfiguracaoEstacionamentoRepository(database.configuracaoEstacionamentoDao())
 
     val loginAttemptService = LoginAttemptService()
     val authService = AuthService(
@@ -56,16 +61,27 @@ class AppContainer(application: Application) {
         movimentacaoRepository = movimentacaoRepository,
         veiculoRepository = veiculoRepository,
         servidorRepository = servidorRepository,
-        veiculoService = veiculoService
+        veiculoService = veiculoService,
+        configuracaoRepository = configuracaoEstacionamentoRepository,
+        contarVisitantesEmVagaEletrica = {
+            visitanteRepository.contarNoCampusPorTipoVaga(TipoVaga.CARREGAMENTO_ELETRICO)
+        }
     )
     val visitanteService = VisitanteService(
-        visitanteRepository = visitanteRepository
+        visitanteRepository = visitanteRepository,
+        configuracaoRepository = configuracaoEstacionamentoRepository,
+        contarServidoresEmVagaEletrica = {
+            movimentacaoRepository.contarEmAbertoPorTipoVaga(TipoVaga.CARREGAMENTO_ELETRICO)
+        }
     )
+    val configuracaoEstacionamentoService =
+        ConfiguracaoEstacionamentoService(configuracaoEstacionamentoRepository)
     val dashboardService = DashboardService(
         servidorRepository = servidorRepository,
         veiculoRepository = veiculoRepository,
         movimentacaoRepository = movimentacaoRepository,
         visitanteRepository = visitanteRepository,
+        configuracaoRepository = configuracaoEstacionamentoRepository,
         calculadoraOcupacao = CalculadoraOcupacao()
     )
     val dadosIniciais = DadosIniciais(
@@ -73,7 +89,8 @@ class AppContainer(application: Application) {
         servidorRepository = servidorRepository,
         veiculoRepository = veiculoRepository,
         movimentacaoRepository = movimentacaoRepository,
-        visitanteRepository = visitanteRepository
+        visitanteRepository = visitanteRepository,
+        configuracaoRepository = configuracaoEstacionamentoRepository
     )
 }
 

@@ -124,6 +124,8 @@ class VisitanteServiceTest {
         override suspend fun buscarNoCampusPorPlaca(placa: String): Visitante? =
             itens.firstOrNull { it.placa.equals(placa, ignoreCase = true) && it.noCampus }
         override suspend fun contar(): Int = itens.size
+        override suspend fun contarNoCampusPorTipoVaga(tipoVaga: TipoVaga): Int =
+            itens.count { it.tipoVaga == tipoVaga && it.noCampus }
         override suspend fun inserir(visitante: Visitante): Long {
             val id = seq++
             itens.add(visitante.copy(id = id))

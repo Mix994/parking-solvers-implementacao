@@ -5,6 +5,7 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Update
+import com.parkingsolvers.smartpark.movimentacao.model.TipoVaga
 import com.parkingsolvers.smartpark.visitante.model.Visitante
 import kotlinx.coroutines.flow.Flow
 
@@ -28,6 +29,9 @@ interface VisitanteDao {
 
     @Query("SELECT COUNT(*) FROM visitante")
     suspend fun contar(): Int
+
+    @Query("SELECT COUNT(*) FROM visitante WHERE tipo_vaga = :tipoVaga AND data_hora_saida_millis IS NULL")
+    suspend fun contarNoCampusPorTipoVaga(tipoVaga: TipoVaga): Int
 
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun inserir(visitante: Visitante): Long

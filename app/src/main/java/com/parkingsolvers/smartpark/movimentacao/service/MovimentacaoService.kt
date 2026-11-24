@@ -6,10 +6,12 @@ import com.parkingsolvers.smartpark.compartilhado.exceptions.RegraDeNegocioExcep
 import com.parkingsolvers.smartpark.compartilhado.util.Formatadores
 import com.parkingsolvers.smartpark.compartilhado.util.TurnoUtils
 import com.parkingsolvers.smartpark.compartilhado.validacao.ValidadorPlaca
+import com.parkingsolvers.smartpark.dashboard.repository.ConfiguracaoEstacionamentoRepository
 import com.parkingsolvers.smartpark.movimentacao.dto.mapper.MovimentacaoMapper
 import com.parkingsolvers.smartpark.movimentacao.dto.request.EntradaRequest
 import com.parkingsolvers.smartpark.movimentacao.dto.response.MovimentacaoResponse
 import com.parkingsolvers.smartpark.movimentacao.model.RegistroMovimentacao
+import com.parkingsolvers.smartpark.movimentacao.model.TipoVaga
 import com.parkingsolvers.smartpark.movimentacao.repository.MovimentacaoRepository
 import com.parkingsolvers.smartpark.servidor.repository.ServidorRepository
 import com.parkingsolvers.smartpark.veiculo.repository.VeiculoRepository
@@ -21,7 +23,9 @@ class MovimentacaoService(
     private val movimentacaoRepository: MovimentacaoRepository,
     private val veiculoRepository: VeiculoRepository,
     private val servidorRepository: ServidorRepository,
-    private val veiculoService: VeiculoService
+    private val veiculoService: VeiculoService,
+    private val configuracaoRepository: ConfiguracaoEstacionamentoRepository? = null,
+    private val contarVisitantesEmVagaEletrica: (suspend () -> Int)? = null
 ) {
 
     fun observarNoEstacionamento(): Flow<List<MovimentacaoResponse>> = combine(
@@ -67,6 +71,17 @@ class MovimentacaoService(
         val consulta = veiculoService.consultarPlaca(placaNormalizada, agoraMillis)
         if (!consulta.autorizado && !request.permitirNaoAutorizado) {
             throw RegraDeNegocioException(consulta.mensagem)
+        }
+
+        if (request.tipoVaga == TipoVaga.CARREGAMENTO_ELETRICO && configuracaoRepository != null) {
+            val capacidade = configuracaoRepository.buscarAtual().capacidadeCarregamentoEletrico
+            val ocupadas = movimentacaoRepository.contarEmAbertoPorTipoVaga(TipoVaga.CARREGAMENTO_ELETRICO) +
+                (contarVisitantesEmVagaEletrica?.invoke() ?: 0)
+            if (ocupadas >= capacidade) {
+                throw ConflitoException(
+                    "Todas as $capacidade vagas de carregamento elétrico estão ocupadas no momento."
+                )
+            }
         }
 
         val registro = RegistroMovimentacao(

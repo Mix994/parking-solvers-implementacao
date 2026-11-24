@@ -138,9 +138,15 @@ fun AppShell(
             ) {
                 composable(AbaNavegacao.DASHBOARD.rota) {
                     val vm: DashboardViewModel = viewModel(
-                        factory = DashboardViewModel.factory(container.dashboardService)
+                        factory = DashboardViewModel.factory(
+                            dashboardService = container.dashboardService,
+                            configuracaoService = container.configuracaoEstacionamentoService
+                        )
                     )
-                    DashboardScreen(viewModel = vm)
+                    DashboardScreen(
+                        viewModel = vm,
+                        podeConfigurarVagas = sessao.perfil == PerfilUsuario.ADMIN
+                    )
                 }
 
                 composable(AbaNavegacao.PORTARIA.rota) {

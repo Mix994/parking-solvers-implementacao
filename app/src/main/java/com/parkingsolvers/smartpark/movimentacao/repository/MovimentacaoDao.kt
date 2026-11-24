@@ -6,6 +6,7 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Update
 import com.parkingsolvers.smartpark.movimentacao.model.RegistroMovimentacao
+import com.parkingsolvers.smartpark.movimentacao.model.TipoVaga
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -28,6 +29,9 @@ interface MovimentacaoDao {
 
     @Query("SELECT COUNT(*) FROM registro_movimentacao WHERE veiculo_id = :veiculoId AND data_hora_saida_millis IS NULL")
     suspend fun contarEmAbertoPorVeiculo(veiculoId: Long): Int
+
+    @Query("SELECT COUNT(*) FROM registro_movimentacao WHERE tipo_vaga = :tipoVaga AND data_hora_saida_millis IS NULL")
+    suspend fun contarEmAbertoPorTipoVaga(tipoVaga: TipoVaga): Int
 
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun inserir(registro: RegistroMovimentacao): Long

@@ -26,7 +26,7 @@ class CalculadoraOcupacaoTest {
             Veiculo(2, 1, "TMP1A23", "Argo", "Azul", TipoCadastroVeiculo.TEMPORARIO, 5_000L, 15_000L, ativo = true)
         )
         val movimentacoes = listOf(
-            RegistroMovimentacao(1, 1, "ABC1D23", true, 8_000L, null, Turno.MANHA, TipoVaga.COMUM),
+            RegistroMovimentacao(1, 1, "ABC1D23", true, 8_000L, null, Turno.MANHA, TipoVaga.CARREGAMENTO_ELETRICO),
             RegistroMovimentacao(2, 2, "TMP1A23", true, 9_000L, null, Turno.TARDE, TipoVaga.EXCLUSIVA_PCD),
             RegistroMovimentacao(3, 1, "ABC1D23", true, 1_000L, 3_000L, Turno.MANHA, TipoVaga.COMUM)
         )
@@ -55,6 +55,9 @@ class CalculadoraOcupacaoTest {
         assertEquals(3, resultado.veiculosNoCampusAgora)
         assertEquals(1, resultado.visitantesNoCampusAgora)
         assertEquals(2, resultado.vagasExclusivasOcupadasAgora)
+        assertEquals(1, resultado.vagasEletricasOcupadasAgora)
+        assertEquals(2, resultado.capacidadeCarregamentoEletrico)
+        assertEquals(0.50f, resultado.percentualEletricasAtual, 0.001f)
         assertEquals(0.15f, resultado.percentualOcupacaoAtual, 0.001f)
         assertEquals(0.50f, resultado.percentualExclusivasAtual, 0.001f)
         assertEquals(1, resultado.totalServidoresAtivos)

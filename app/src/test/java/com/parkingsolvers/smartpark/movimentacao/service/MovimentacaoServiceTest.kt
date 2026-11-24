@@ -3,6 +3,9 @@ package com.parkingsolvers.smartpark.movimentacao.service
 import com.parkingsolvers.smartpark.auth.service.AuthServiceTest
 import com.parkingsolvers.smartpark.compartilhado.exceptions.ConflitoException
 import com.parkingsolvers.smartpark.compartilhado.exceptions.RegraDeNegocioException
+import com.parkingsolvers.smartpark.dashboard.model.ConfiguracaoEstacionamento
+import com.parkingsolvers.smartpark.dashboard.repository.ConfiguracaoEstacionamentoRepository
+import com.parkingsolvers.smartpark.dashboard.service.ConfiguracaoEstacionamentoServiceTest
 import com.parkingsolvers.smartpark.movimentacao.dto.request.EntradaRequest
 import com.parkingsolvers.smartpark.movimentacao.model.RegistroMovimentacao
 import com.parkingsolvers.smartpark.movimentacao.model.TipoVaga
@@ -83,19 +86,65 @@ class MovimentacaoServiceTest {
         assertTrue(mov.emAberto)
     }
 
+    @Test
+    fun respeitaLimiteDeDuasVagasEletricasELiberaAposExpansao() = runBlocking {
+        val configDao = ConfiguracaoEstacionamentoServiceTest.FakeConfiguracaoDao(
+            ConfiguracaoEstacionamento(capacidadeTotal = 60, capacidadeExclusivas = 10, capacidadeCarregamentoEletrico = 2)
+        )
+        val configRepo = ConfiguracaoEstacionamentoRepository(configDao)
+        val env = criarAmbiente(configRepo)
+
+        env.movimentacaoService.registrarEntrada(
+            EntradaRequest("AAA1A11", tipoVaga = TipoVaga.CARREGAMENTO_ELETRICO, permitirNaoAutorizado = true),
+            agoraMillis = 10_000L
+        )
+        env.movimentacaoService.registrarEntrada(
+            EntradaRequest("BBB2B22", tipoVaga = TipoVaga.CARREGAMENTO_ELETRICO, permitirNaoAutorizado = true),
+            agoraMillis = 11_000L
+        )
+
+        // 3º carro elétrico bloqueado com limite em 2
+        var bloqueado = false
+        try {
+            env.movimentacaoService.registrarEntrada(
+                EntradaRequest("CCC3C33", tipoVaga = TipoVaga.CARREGAMENTO_ELETRICO, permitirNaoAutorizado = true),
+                agoraMillis = 12_000L
+            )
+        } catch (_: ConflitoException) {
+            bloqueado = true
+        }
+        assertTrue(bloqueado)
+
+        // Após expansão para 3 vagas, o 3º carro elétrico é aceito
+        configRepo.salvar(ConfiguracaoEstacionamento(capacidadeCarregamentoEletrico = 3))
+        val entradaExpandida = env.movimentacaoService.registrarEntrada(
+            EntradaRequest("CCC3C33", tipoVaga = TipoVaga.CARREGAMENTO_ELETRICO, permitirNaoAutorizado = true),
+            agoraMillis = 13_000L
+        )
+        assertTrue(entradaExpandida.emAberto)
+    }
+
     private data class Ambiente(
         val servidorService: ServidorService,
         val veiculoService: VeiculoService,
         val movimentacaoService: MovimentacaoService
     )
 
-    private fun criarAmbiente(): Ambiente {
+    private fun criarAmbiente(
+        configRepo: ConfiguracaoEstacionamentoRepository? = null
+    ): Ambiente {
         val servidorRepo = ServidorRepository(AuthServiceTest.FakeServidorDao())
         val veiculoRepo = VeiculoRepository(FakeVeiculoDao())
         val movRepo = MovimentacaoRepository(FakeMovimentacaoDao())
         val servidorService = ServidorService(servidorRepo)
         val veiculoService = VeiculoService(veiculoRepo, servidorRepo, servidorService)
-        val movService = MovimentacaoService(movRepo, veiculoRepo, servidorRepo, veiculoService)
+        val movService = MovimentacaoService(
+            movRepo,
+            veiculoRepo,
+            servidorRepo,
+            veiculoService,
+            configuracaoRepository = configRepo
+        )
         return Ambiente(servidorService, veiculoService, movService)
     }
 
@@ -139,6 +188,8 @@ class MovimentacaoServiceTest {
             itens.firstOrNull { it.placaRegistrada.equals(placa, ignoreCase = true) && it.emAberto }
         override suspend fun contarEmAbertoPorVeiculo(veiculoId: Long): Int =
             itens.count { it.veiculoId == veiculoId && it.emAberto }
+        override suspend fun contarEmAbertoPorTipoVaga(tipoVaga: TipoVaga): Int =
+            itens.count { it.tipoVaga == tipoVaga && it.emAberto }
         override suspend fun inserir(registro: RegistroMovimentacao): Long {
             val id = seq++
             itens.add(registro.copy(id = id))

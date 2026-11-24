@@ -1,6 +1,7 @@
 package com.parkingsolvers.smartpark.movimentacao.repository
 
 import com.parkingsolvers.smartpark.movimentacao.model.RegistroMovimentacao
+import com.parkingsolvers.smartpark.movimentacao.model.TipoVaga
 import kotlinx.coroutines.flow.Flow
 
 class MovimentacaoRepository(private val dao: MovimentacaoDao) {
@@ -13,6 +14,9 @@ class MovimentacaoRepository(private val dao: MovimentacaoDao) {
 
     suspend fun buscarEmAbertoPorPlaca(placa: String): RegistroMovimentacao? =
         dao.buscarEmAbertoPorPlaca(placa)
+
+    suspend fun contarEmAbertoPorTipoVaga(tipoVaga: TipoVaga): Int =
+        dao.contarEmAbertoPorTipoVaga(tipoVaga)
 
     suspend fun salvar(registro: RegistroMovimentacao): Long = dao.inserir(registro)
 

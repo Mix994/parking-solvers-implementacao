@@ -3,6 +3,7 @@ package com.parkingsolvers.smartpark.dashboard.service
 import com.parkingsolvers.smartpark.dashboard.dto.response.DashboardOcupacaoResponse
 import com.parkingsolvers.smartpark.dashboard.dto.response.OcupacaoPorTurnoItem
 import com.parkingsolvers.smartpark.dashboard.dto.response.UsoVagaItem
+import com.parkingsolvers.smartpark.dashboard.model.ConfiguracaoEstacionamento
 import com.parkingsolvers.smartpark.movimentacao.model.RegistroMovimentacao
 import com.parkingsolvers.smartpark.movimentacao.model.TipoVaga
 import com.parkingsolvers.smartpark.movimentacao.model.Turno
@@ -14,11 +15,12 @@ import java.util.Calendar
 
 /**
  * Calculadora pura das métricas do painel de ocupação, consolidando
- * movimentações de servidores e registros de visitantes externos.
+ * movimentações de servidores, visitantes externos e vagas de carregamento elétrico.
  */
 class CalculadoraOcupacao(
-    private val capacidadeTotal: Int = CAPACIDADE_PADRAO_CAMPUS,
-    private val capacidadeExclusivas: Int = CAPACIDADE_PADRAO_EXCLUSIVAS
+    private val capacidadeTotal: Int = ConfiguracaoEstacionamento.CAPACIDADE_TOTAL_PADRAO,
+    private val capacidadeExclusivas: Int = ConfiguracaoEstacionamento.CAPACIDADE_EXCLUSIVAS_PADRAO,
+    private val capacidadeCarregamentoEletrico: Int = ConfiguracaoEstacionamento.CAPACIDADE_ELETRICO_PADRAO
 ) {
 
     fun calcular(
@@ -27,8 +29,17 @@ class CalculadoraOcupacao(
         movimentacoes: List<RegistroMovimentacao>,
         agoraMillis: Long = System.currentTimeMillis(),
         inicioPeriodoMillis: Long? = null,
-        visitantes: List<Visitante> = emptyList()
+        visitantes: List<Visitante> = emptyList(),
+        configuracao: ConfiguracaoEstacionamento = ConfiguracaoEstacionamento(
+            capacidadeTotal = capacidadeTotal,
+            capacidadeExclusivas = capacidadeExclusivas,
+            capacidadeCarregamentoEletrico = capacidadeCarregamentoEletrico
+        )
     ): DashboardOcupacaoResponse {
+        val capTotal = configuracao.capacidadeTotal
+        val capExclusivas = configuracao.capacidadeExclusivas
+        val capEletricas = configuracao.capacidadeCarregamentoEletrico
+
         val movEmAberto = movimentacoes.filter { it.emAberto }
         val visEmAberto = visitantes.filter { it.noCampus }
 
@@ -36,6 +47,8 @@ class CalculadoraOcupacao(
         val visitantesAgora = visEmAberto.size
         val exclusivasAgora = movEmAberto.count { it.tipoVaga.ehExclusiva } +
             visEmAberto.count { it.tipoVaga.ehExclusiva }
+        val eletricasAgora = movEmAberto.count { it.tipoVaga.ehCarregamentoEletrico } +
+            visEmAberto.count { it.tipoVaga.ehCarregamentoEletrico }
 
         val movDoPeriodo = if (inicioPeriodoMillis == null) {
             movimentacoes
@@ -63,7 +76,7 @@ class CalculadoraOcupacao(
                 totalEntradas = entradasTurno,
                 atualmenteEstacionados = estacionadosTurno,
                 mediaDiariaEntradas = mediaDiaria,
-                percentualLotacao = calcularPercentual(mediaDiaria, capacidadeTotal)
+                percentualLotacao = calcularPercentual(mediaDiaria, capTotal)
             )
         }
 
@@ -82,13 +95,16 @@ class CalculadoraOcupacao(
         }
 
         return DashboardOcupacaoResponse(
-            capacidadeTotal = capacidadeTotal,
-            capacidadeExclusivas = capacidadeExclusivas,
+            capacidadeTotal = capTotal,
+            capacidadeExclusivas = capExclusivas,
+            capacidadeCarregamentoEletrico = capEletricas,
             veiculosNoCampusAgora = estacionadosAgora,
             visitantesNoCampusAgora = visitantesAgora,
             vagasExclusivasOcupadasAgora = exclusivasAgora,
-            percentualOcupacaoAtual = calcularPercentual(estacionadosAgora.toFloat(), capacidadeTotal),
-            percentualExclusivasAtual = calcularPercentual(exclusivasAgora.toFloat(), capacidadeExclusivas),
+            vagasEletricasOcupadasAgora = eletricasAgora,
+            percentualOcupacaoAtual = calcularPercentual(estacionadosAgora.toFloat(), capTotal),
+            percentualExclusivasAtual = calcularPercentual(exclusivasAgora.toFloat(), capExclusivas),
+            percentualEletricasAtual = calcularPercentual(eletricasAgora.toFloat(), capEletricas),
             totalServidoresAtivos = servidores.count { it.ativo },
             totalVeiculosAtivos = veiculos.count { it.ativo },
             totalTemporariosVigentes = temporariosVigentes,
@@ -114,7 +130,8 @@ class CalculadoraOcupacao(
     }
 
     companion object {
-        const val CAPACIDADE_PADRAO_CAMPUS = 60
-        const val CAPACIDADE_PADRAO_EXCLUSIVAS = 10
+        const val CAPACIDADE_PADRAO_CAMPUS = ConfiguracaoEstacionamento.CAPACIDADE_TOTAL_PADRAO
+        const val CAPACIDADE_PADRAO_EXCLUSIVAS = ConfiguracaoEstacionamento.CAPACIDADE_EXCLUSIVAS_PADRAO
+        const val CAPACIDADE_PADRAO_ELETRICAS = ConfiguracaoEstacionamento.CAPACIDADE_ELETRICO_PADRAO
     }
 }

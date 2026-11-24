@@ -236,7 +236,11 @@ private fun VisitanteAtivoCard(
                 PlacaMercosulChip(placa = visitante.placa)
                 StatusBadge(
                     texto = visitante.tipoVaga.label,
-                    tone = if (visitante.tipoVaga.ehExclusiva) BadgeTone.ALERTA else BadgeTone.INFO
+                    tone = when {
+                        visitante.tipoVaga.ehCarregamentoEletrico -> BadgeTone.SUCESSO
+                        visitante.tipoVaga.ehExclusiva -> BadgeTone.ALERTA
+                        else -> BadgeTone.INFO
+                    }
                 )
             }
 

@@ -8,6 +8,8 @@ import com.parkingsolvers.smartpark.compartilhado.util.RelogioSistemaReal
 import com.parkingsolvers.smartpark.compartilhado.util.TurnoUtils
 import com.parkingsolvers.smartpark.compartilhado.validacao.ValidadorFormulario
 import com.parkingsolvers.smartpark.compartilhado.validacao.ValidadorPlaca
+import com.parkingsolvers.smartpark.dashboard.repository.ConfiguracaoEstacionamentoRepository
+import com.parkingsolvers.smartpark.movimentacao.model.TipoVaga
 import com.parkingsolvers.smartpark.visitante.dto.mapper.VisitanteMapper
 import com.parkingsolvers.smartpark.visitante.dto.request.VisitanteRequest
 import com.parkingsolvers.smartpark.visitante.dto.response.VisitanteResponse
@@ -17,7 +19,9 @@ import kotlinx.coroutines.flow.map
 
 class VisitanteService(
     private val visitanteRepository: VisitanteRepository,
-    private val relogio: RelogioSistema = RelogioSistemaReal
+    private val relogio: RelogioSistema = RelogioSistemaReal,
+    private val configuracaoRepository: ConfiguracaoEstacionamentoRepository? = null,
+    private val contarServidoresEmVagaEletrica: (suspend () -> Int)? = null
 ) {
 
     fun observarNoCampus(): Flow<List<VisitanteResponse>> =
@@ -39,6 +43,17 @@ class VisitanteService(
             throw ConflitoException(
                 "O visitante com placa ${Formatadores.formatarPlaca(placaNormalizada)} já está registrado no campus."
             )
+        }
+
+        if (request.tipoVaga == TipoVaga.CARREGAMENTO_ELETRICO && configuracaoRepository != null) {
+            val capacidade = configuracaoRepository.buscarAtual().capacidadeCarregamentoEletrico
+            val ocupadas = visitanteRepository.contarNoCampusPorTipoVaga(TipoVaga.CARREGAMENTO_ELETRICO) +
+                (contarServidoresEmVagaEletrica?.invoke() ?: 0)
+            if (ocupadas >= capacidade) {
+                throw ConflitoException(
+                    "Todas as $capacidade vagas de carregamento elétrico estão ocupadas no momento."
+                )
+            }
         }
 
         val turno = TurnoUtils.determinarTurno(agoraMillis)

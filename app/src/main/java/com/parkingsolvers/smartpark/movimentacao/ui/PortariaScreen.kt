@@ -368,7 +368,11 @@ private fun MovimentacaoAtivaCard(
                 PlacaMercosulChip(placa = movimentacao.placa)
                 StatusBadge(
                     texto = movimentacao.tipoVaga.label,
-                    tone = if (movimentacao.tipoVaga.ehExclusiva) BadgeTone.ALERTA else BadgeTone.INFO
+                    tone = when {
+                        movimentacao.tipoVaga.ehCarregamentoEletrico -> BadgeTone.SUCESSO
+                        movimentacao.tipoVaga.ehExclusiva -> BadgeTone.ALERTA
+                        else -> BadgeTone.INFO
+                    }
                 )
             }
             Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {

@@ -2,6 +2,8 @@ package com.parkingsolvers.smartpark.dev
 
 import com.parkingsolvers.smartpark.auth.model.PerfilUsuario
 import com.parkingsolvers.smartpark.auth.service.SenhaHasher
+import com.parkingsolvers.smartpark.dashboard.model.ConfiguracaoEstacionamento
+import com.parkingsolvers.smartpark.dashboard.repository.ConfiguracaoEstacionamentoRepository
 import com.parkingsolvers.smartpark.movimentacao.model.RegistroMovimentacao
 import com.parkingsolvers.smartpark.movimentacao.model.TipoVaga
 import com.parkingsolvers.smartpark.movimentacao.model.Turno
@@ -25,13 +27,19 @@ class DadosIniciais(
     private val servidorRepository: ServidorRepository,
     private val veiculoRepository: VeiculoRepository,
     private val movimentacaoRepository: MovimentacaoRepository,
-    private val visitanteRepository: VisitanteRepository
+    private val visitanteRepository: VisitanteRepository,
+    private val configuracaoRepository: ConfiguracaoEstacionamentoRepository
 ) {
 
     suspend fun popularSeVazio() {
+        popularConfiguracaoPadrao()
         popularServidoresVeiculosEMovimentacoes()
         popularUsuariosIniciais()
         popularVisitantesIniciais()
+    }
+
+    private suspend fun popularConfiguracaoPadrao() {
+        configuracaoRepository.salvar(configuracaoRepository.buscarAtual())
     }
 
     private suspend fun popularServidoresVeiculosEMovimentacoes() {
@@ -118,8 +126,8 @@ class DadosIniciais(
                 dataHoraEntradaMillis = agora - (3 * umaHora),
                 dataHoraSaidaMillis = null,
                 turno = Turno.MANHA,
-                tipoVaga = TipoVaga.COMUM,
-                observacao = "Entrada regular docente"
+                tipoVaga = TipoVaga.CARREGAMENTO_ELETRICO,
+                observacao = "Estação de recarga 01 — entrada docente"
             )
         )
         movimentacaoRepository.salvar(

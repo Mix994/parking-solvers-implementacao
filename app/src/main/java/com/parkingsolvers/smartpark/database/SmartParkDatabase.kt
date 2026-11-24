@@ -5,6 +5,8 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
+import com.parkingsolvers.smartpark.dashboard.model.ConfiguracaoEstacionamento
+import com.parkingsolvers.smartpark.dashboard.repository.ConfiguracaoEstacionamentoDao
 import com.parkingsolvers.smartpark.movimentacao.model.RegistroMovimentacao
 import com.parkingsolvers.smartpark.movimentacao.repository.MovimentacaoDao
 import com.parkingsolvers.smartpark.servidor.model.Servidor
@@ -22,9 +24,10 @@ import com.parkingsolvers.smartpark.visitante.repository.VisitanteDao
         Servidor::class,
         Veiculo::class,
         RegistroMovimentacao::class,
-        Visitante::class
+        Visitante::class,
+        ConfiguracaoEstacionamento::class
     ],
-    version = 3,
+    version = 4,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -35,6 +38,7 @@ abstract class SmartParkDatabase : RoomDatabase() {
     abstract fun veiculoDao(): VeiculoDao
     abstract fun movimentacaoDao(): MovimentacaoDao
     abstract fun visitanteDao(): VisitanteDao
+    abstract fun configuracaoEstacionamentoDao(): ConfiguracaoEstacionamentoDao
 
     companion object {
         private const val DATABASE_NAME = "parking_solvers_smartpark.db"
