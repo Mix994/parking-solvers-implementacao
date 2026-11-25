@@ -52,7 +52,7 @@ fun MeusDadosDialog(
 
     LaunchedEffect(sessao.usuarioId) {
         try {
-            val conta = usuarioService.buscarPorId(sessao.usuarioId)
+            val conta = usuarioService.buscarProprioPerfil()
             nome = conta.nome
             login = conta.login
         } catch (_: RegraDeNegocioException) {

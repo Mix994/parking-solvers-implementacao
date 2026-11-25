@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.AccountCircle
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -94,6 +95,12 @@ fun AppShell(
                         }
                     },
                     actions = {
+                        IconButton(onClick = { container.sincronizador.notificarMudanca() }) {
+                            Icon(
+                                imageVector = Icons.Default.Refresh,
+                                contentDescription = "Atualizar dados"
+                            )
+                        }
                         IconButton(onClick = { mostrarMeusDados = true }) {
                             Icon(
                                 imageVector = Icons.Default.AccountCircle,

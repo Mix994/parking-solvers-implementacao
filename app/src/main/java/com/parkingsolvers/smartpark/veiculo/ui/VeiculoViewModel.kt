@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -38,8 +39,13 @@ class VeiculoViewModel(
         }
     ).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    val servidores: StateFlow<List<ServidorResponse>> = servidorService.observarTodos()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    val servidores: StateFlow<List<ServidorResponse>> = (
+        if (servidorIdFiltro != null) {
+            flowOf(emptyList())
+        } else {
+            servidorService.observarTodos()
+        }
+    ).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     private val _uiState = MutableStateFlow(VeiculoUiState())
     val uiState: StateFlow<VeiculoUiState> = _uiState.asStateFlow()

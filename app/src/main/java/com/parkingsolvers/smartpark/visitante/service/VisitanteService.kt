@@ -1,118 +1,35 @@
 package com.parkingsolvers.smartpark.visitante.service
 
-import com.parkingsolvers.smartpark.compartilhado.exceptions.ConflitoException
-import com.parkingsolvers.smartpark.compartilhado.exceptions.RecursoNaoEncontradoException
-import com.parkingsolvers.smartpark.compartilhado.util.Formatadores
-import com.parkingsolvers.smartpark.compartilhado.util.RelogioSistema
-import com.parkingsolvers.smartpark.compartilhado.util.RelogioSistemaReal
-import com.parkingsolvers.smartpark.compartilhado.util.TurnoUtils
-import com.parkingsolvers.smartpark.compartilhado.validacao.ValidadorFormulario
-import com.parkingsolvers.smartpark.compartilhado.validacao.ValidadorPlaca
-import com.parkingsolvers.smartpark.dashboard.repository.ConfiguracaoEstacionamentoRepository
-import com.parkingsolvers.smartpark.movimentacao.model.TipoVaga
-import com.parkingsolvers.smartpark.visitante.dto.mapper.VisitanteMapper
+import com.parkingsolvers.smartpark.rede.ApiErrorMapper
+import com.parkingsolvers.smartpark.rede.SincronizadorDados
+import com.parkingsolvers.smartpark.rede.SmartParkApi
+import com.parkingsolvers.smartpark.rede.fluxoRemoto
 import com.parkingsolvers.smartpark.visitante.dto.request.VisitanteRequest
 import com.parkingsolvers.smartpark.visitante.dto.response.VisitanteResponse
-import com.parkingsolvers.smartpark.visitante.repository.VisitanteRepository
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.map
 
 class VisitanteService(
-    private val visitanteRepository: VisitanteRepository,
-    private val relogio: RelogioSistema = RelogioSistemaReal,
-    private val configuracaoRepository: ConfiguracaoEstacionamentoRepository? = null,
-    private val contarServidoresEmVagaEletrica: (suspend () -> Int)? = null
+    private val api: SmartParkApi,
+    private val sincronizador: SincronizadorDados
 ) {
-
     fun observarNoCampus(): Flow<List<VisitanteResponse>> =
-        visitanteRepository.observarNoCampus().map { lista -> lista.map(VisitanteMapper::paraResponse) }
+        fluxoRemoto(sincronizador, emptyList()) {
+            api.listarVisitantesNoCampus().map { it.paraDominio() }
+        }
 
     fun observarHistorico(): Flow<List<VisitanteResponse>> =
-        visitanteRepository.observarTodos().map { lista -> lista.map(VisitanteMapper::paraResponse) }
+        fluxoRemoto(sincronizador, emptyList()) {
+            api.listarVisitantes().map { it.paraDominio() }
+        }
 
     suspend fun registrarEntrada(
         request: VisitanteRequest,
-        registradoPor: String,
-        agoraMillis: Long = relogio.agoraMillis()
-    ): VisitanteResponse {
-        validarCampos(request)
+        @Suppress("UNUSED_PARAMETER") registradoPor: String
+    ): VisitanteResponse =
+        ApiErrorMapper.executar { api.registrarEntradaVisitante(request).paraDominio() }
+            .also { sincronizador.notificarMudanca() }
 
-        val placaNormalizada = ValidadorPlaca.validarENormalizar(request.placa)
-
-        if (visitanteRepository.buscarNoCampusPorPlaca(placaNormalizada) != null) {
-            throw ConflitoException(
-                "O visitante com placa ${Formatadores.formatarPlaca(placaNormalizada)} já está registrado no campus."
-            )
-        }
-
-        if (request.tipoVaga == TipoVaga.CARREGAMENTO_ELETRICO && configuracaoRepository != null) {
-            val capacidade = configuracaoRepository.buscarAtual().capacidadeCarregamentoEletrico
-            val ocupadas = visitanteRepository.contarNoCampusPorTipoVaga(TipoVaga.CARREGAMENTO_ELETRICO) +
-                (contarServidoresEmVagaEletrica?.invoke() ?: 0)
-            if (ocupadas >= capacidade) {
-                throw ConflitoException(
-                    "Todas as $capacidade vagas de carregamento elétrico estão ocupadas no momento."
-                )
-            }
-        }
-
-        val turno = TurnoUtils.determinarTurno(agoraMillis)
-        val entidade = VisitanteMapper.paraEntidade(
-            request = request,
-            placaNormalizada = placaNormalizada,
-            turno = turno,
-            registradoPor = registradoPor.ifBlank { "Portaria" },
-            entradaMillis = agoraMillis
-        )
-        val novoId = visitanteRepository.salvar(entidade)
-        return VisitanteMapper.paraResponse(entidade.copy(id = novoId))
-    }
-
-    suspend fun registrarSaida(
-        visitanteId: Long,
-        agoraMillis: Long = relogio.agoraMillis()
-    ): VisitanteResponse {
-        val visitante = visitanteRepository.buscarPorId(visitanteId)
-            ?: throw RecursoNaoEncontradoException("Visitante", visitanteId)
-
-        if (!visitante.noCampus) {
-            throw ConflitoException("A saída deste visitante já foi registrada.")
-        }
-
-        val atualizado = visitante.copy(dataHoraSaidaMillis = agoraMillis)
-        visitanteRepository.atualizar(atualizado)
-        return VisitanteMapper.paraResponse(atualizado)
-    }
-
-    private fun validarCampos(request: VisitanteRequest) {
-        val erros = mutableMapOf<String, String>()
-        if (request.nome.trim().length < 3) {
-            erros["nome"] = "Informe o nome completo do visitante."
-        }
-        if (!ValidadorFormulario.validarDocumento(request.documento)) {
-            erros["documento"] = "Informe um CPF ou RG válido (mínimo 5 dígitos)."
-        }
-        if (request.instituicaoOrigem.isBlank()) {
-            erros["instituicaoOrigem"] = "Informe a instituição, cidade ou empresa de origem."
-        }
-        if (!ValidadorFormulario.validarTelefone(request.telefone)) {
-            erros["telefone"] = "Informe um telefone válido (ex.: (11) 99999-8888)."
-        }
-        if (!ValidadorPlaca.ehValida(request.placa)) {
-            erros["placa"] = "Formato inválido. Use AAA-1234 ou Mercosul (ABC1D23)."
-        }
-        if (request.modeloVeiculo.isBlank()) {
-            erros["modeloVeiculo"] = "Informe o modelo do veículo."
-        }
-        if (request.corVeiculo.isBlank()) {
-            erros["corVeiculo"] = "Informe a cor do veículo."
-        }
-        if (request.motivoVisita.isBlank()) {
-            erros["motivoVisita"] = "Informe o motivo da visita."
-        }
-        if (request.setorDestino.isBlank()) {
-            erros["setorDestino"] = "Informe o setor ou pessoa visitada no campus."
-        }
-        ValidadorFormulario.lancarSeHouverErros(erros)
-    }
+    suspend fun registrarSaida(visitanteId: Long): VisitanteResponse =
+        ApiErrorMapper.executar { api.registrarSaidaVisitante(visitanteId).paraDominio() }
+            .also { sincronizador.notificarMudanca() }
 }

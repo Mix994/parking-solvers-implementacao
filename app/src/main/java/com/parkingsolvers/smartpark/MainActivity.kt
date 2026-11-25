@@ -43,9 +43,7 @@ class MainActivity : ComponentActivity() {
                     if (usuarioLogado == null) {
                         val loginViewModel: LoginViewModel = viewModel(
                             factory = LoginViewModel.factory(
-                                authService = container.authService,
-                                usuarioService = container.usuarioService,
-                                servidorService = container.servidorService
+                                authService = container.authService
                             )
                         )
                         LoginScreen(viewModel = loginViewModel)
