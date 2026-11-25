@@ -4,16 +4,19 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.parkingsolvers.smartpark.compartilhado.exceptions.RegraDeNegocioException
+import com.parkingsolvers.smartpark.compartilhado.validacao.ValidadorPlaca
 import com.parkingsolvers.smartpark.movimentacao.dto.request.EntradaRequest
 import com.parkingsolvers.smartpark.movimentacao.dto.response.MovimentacaoResponse
 import com.parkingsolvers.smartpark.movimentacao.model.TipoVaga
 import com.parkingsolvers.smartpark.movimentacao.service.MovimentacaoService
 import com.parkingsolvers.smartpark.veiculo.dto.response.ResultadoConsultaPlaca
+import com.parkingsolvers.smartpark.veiculo.dto.response.VeiculoResponse
 import com.parkingsolvers.smartpark.veiculo.service.VeiculoService
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -39,29 +42,83 @@ class PortariaViewModel(
         movimentacaoService.observarHistorico()
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
+    private val veiculosCadastrados: StateFlow<List<VeiculoResponse>> =
+        veiculoService.observarTodos()
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
     private val _uiState = MutableStateFlow(PortariaUiState())
     val uiState: StateFlow<PortariaUiState> = _uiState.asStateFlow()
 
+    /**
+     * Correspondências em tempo real ao digitar parte da placa (a partir de 2 caracteres).
+     * Prioriza placas que começam com o trecho digitado e veículos ativos.
+     */
+    val correspondenciasPlaca: StateFlow<List<VeiculoResponse>> = combine(
+        _uiState,
+        veiculosCadastrados
+    ) { estado, veiculos ->
+        val termo = estado.placaBusca.trim().uppercase().replace("-", "")
+        if (termo.length < 2) {
+            emptyList()
+        } else if (estado.resultadoConsulta?.placaConsultada == termo) {
+            emptyList()
+        } else {
+            veiculos
+                .filter { it.placa.contains(termo) }
+                .sortedWith(
+                    compareByDescending<VeiculoResponse> { it.placa.startsWith(termo) }
+                        .thenByDescending { it.ativo }
+                        .thenBy { it.placa }
+                )
+                .take(5)
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
     fun atualizarPlacaBusca(placa: String) {
-        _uiState.update {
-            it.copy(
-                placaBusca = placa.uppercase().take(8),
+        val limpa = placa.uppercase().take(8)
+        _uiState.update { atual ->
+            val mudouPlaca = atual.resultadoConsulta?.placaConsultada != limpa.trim().replace("-", "")
+            atual.copy(
+                placaBusca = limpa,
+                resultadoConsulta = if (mudouPlaca) null else atual.resultadoConsulta,
                 erro = null,
                 mensagemFeedback = null
             )
         }
     }
 
+    fun selecionarPlacaSugerida(placa: String) {
+        _uiState.update {
+            it.copy(
+                placaBusca = placa,
+                erro = null,
+                mensagemFeedback = null
+            )
+        }
+        consultarPlaca(placa)
+    }
+
     fun selecionarTipoVaga(tipoVaga: TipoVaga) {
         _uiState.update { it.copy(tipoVagaSelecionado = tipoVaga) }
     }
 
-    fun consultarPlaca() {
-        val placa = _uiState.value.placaBusca
+    fun consultarPlaca(placaForcada: String? = null) {
+        val digitada = placaForcada ?: _uiState.value.placaBusca
+        val placaParaConsultar = when {
+            ValidadorPlaca.ehValida(digitada) -> digitada
+            correspondenciasPlaca.value.size == 1 -> correspondenciasPlaca.value.first().placa
+            else -> digitada
+        }
         viewModelScope.launch {
-            _uiState.update { it.copy(erro = null, mensagemFeedback = null) }
+            _uiState.update {
+                it.copy(
+                    placaBusca = placaParaConsultar,
+                    erro = null,
+                    mensagemFeedback = null
+                )
+            }
             try {
-                val resultado = veiculoService.consultarPlaca(placa)
+                val resultado = veiculoService.consultarPlaca(placaParaConsultar)
                 _uiState.update { it.copy(resultadoConsulta = resultado) }
             } catch (e: RegraDeNegocioException) {
                 _uiState.update { it.copy(erro = e.message, resultadoConsulta = null) }
@@ -101,7 +158,6 @@ class PortariaViewModel(
             try {
                 val saida = movimentacaoService.registrarSaida(movimentacaoId)
                 _uiState.update {
-                    // Se a saída foi da placa que estava sendo consultada, limpa a consulta.
                     val consultaDaMesmaPlaca = it.resultadoConsulta?.placaConsultada == saida.placa
                     it.copy(
                         resultadoConsulta = if (consultaDaMesmaPlaca) null else it.resultadoConsulta,

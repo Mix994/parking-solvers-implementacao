@@ -22,6 +22,10 @@ class ServidorService(
         ApiErrorMapper.executar { api.cadastrarServidor(request) }
             .also { sincronizador.notificarMudanca() }
 
+    suspend fun atualizar(id: Long, request: ServidorRequest): ServidorResponse =
+        ApiErrorMapper.executar { api.atualizarServidor(id, request) }
+            .also { sincronizador.notificarMudanca() }
+
     suspend fun alternarAtivo(id: Long): ServidorResponse =
         ApiErrorMapper.executar { api.alternarAtivoServidor(id) }
             .also { sincronizador.notificarMudanca() }

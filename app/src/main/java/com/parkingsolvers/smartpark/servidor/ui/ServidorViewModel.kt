@@ -47,6 +47,21 @@ class ServidorViewModel(
         }
     }
 
+    fun atualizar(id: Long, request: ServidorRequest, onSucesso: () -> Unit) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(erroGeral = null, errosCampos = emptyMap(), mensagemFeedback = null) }
+            try {
+                servidorService.atualizar(id, request)
+                _uiState.update { it.copy(mensagemFeedback = "Cadastro do servidor atualizado com sucesso.") }
+                onSucesso()
+            } catch (e: ValidacaoException) {
+                _uiState.update { it.copy(errosCampos = e.errosValidacao, erroGeral = e.message) }
+            } catch (e: RegraDeNegocioException) {
+                _uiState.update { it.copy(erroGeral = e.message) }
+            }
+        }
+    }
+
     fun alternarAtivo(id: Long) {
         viewModelScope.launch {
             try {

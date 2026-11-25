@@ -7,6 +7,7 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -20,6 +21,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -32,6 +34,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -55,6 +58,7 @@ import com.parkingsolvers.smartpark.ui.components.SmartParkCard
 import com.parkingsolvers.smartpark.ui.components.StatusBadge
 import com.parkingsolvers.smartpark.veiculo.dto.response.ResultadoConsultaPlaca
 import com.parkingsolvers.smartpark.veiculo.dto.response.StatusAutorizacao
+import com.parkingsolvers.smartpark.veiculo.dto.response.VeiculoResponse
 
 @Composable
 fun PortariaScreen(
@@ -64,6 +68,7 @@ fun PortariaScreen(
     val uiState by viewModel.uiState.collectAsState()
     val noEstacionamento by viewModel.noEstacionamento.collectAsState()
     val historico by viewModel.historico.collectAsState()
+    val correspondencias by viewModel.correspondenciasPlaca.collectAsState()
 
     LazyColumn(
         modifier = Modifier
@@ -87,7 +92,7 @@ fun PortariaScreen(
                 ) {
                     val placaDigitada = uiState.placaBusca
                     val placaComErro = placaDigitada.length >= 7 && !ValidadorPlaca.ehValida(placaDigitada)
-                    val podeConsultar = ValidadorPlaca.ehValida(placaDigitada)
+                    val podeConsultar = ValidadorPlaca.ehValida(placaDigitada) || correspondencias.size == 1
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -96,7 +101,7 @@ fun PortariaScreen(
                         OutlinedTextField(
                             value = placaDigitada,
                             onValueChange = viewModel::atualizarPlacaBusca,
-                            label = { Text("Placa (AAA-1234 ou ABC1D23)") },
+                            label = { Text("Placa (digite parte ou completa)") },
                             singleLine = true,
                             isError = placaComErro,
                             supportingText = if (placaComErro) {
@@ -115,10 +120,30 @@ fun PortariaScreen(
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Button(
-                            onClick = viewModel::consultarPlaca,
+                            onClick = { viewModel.consultarPlaca() },
                             enabled = podeConsultar
                         ) {
                             Icon(Icons.Default.Search, contentDescription = "Consultar placa")
+                        }
+                    }
+
+                    AnimatedVisibility(
+                        visible = correspondencias.isNotEmpty() && uiState.resultadoConsulta == null,
+                        enter = fadeIn(tween(180)) + expandVertically(tween(200)),
+                        exit = fadeOut(tween(140)) + shrinkVertically(tween(160))
+                    ) {
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text(
+                                text = "Correspondências encontradas (toque para consultar)",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            correspondencias.forEach { veiculo ->
+                                SugestaoPlacaItem(
+                                    veiculo = veiculo,
+                                    onClick = { viewModel.selecionarPlacaSugerida(veiculo.placa) }
+                                )
+                            }
                         }
                     }
 
@@ -232,6 +257,52 @@ fun PortariaScreen(
         }
 
         item { Spacer(modifier = Modifier.height(16.dp)) }
+    }
+}
+
+@Composable
+private fun SugestaoPlacaItem(
+    veiculo: VeiculoResponse,
+    onClick: () -> Unit
+) {
+    Surface(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(10.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                modifier = Modifier.weight(1f)
+            ) {
+                PlacaMercosulChip(placa = veiculo.placa)
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = veiculo.servidorNome,
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Medium
+                    )
+                    Text(
+                        text = "${veiculo.modelo} • ${veiculo.cor}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+            StatusBadge(
+                texto = if (veiculo.validoNoMomento) "Autorizado" else "Verificar",
+                tone = if (veiculo.validoNoMomento) BadgeTone.SUCESSO else BadgeTone.ALERTA
+            )
+        }
     }
 }
 

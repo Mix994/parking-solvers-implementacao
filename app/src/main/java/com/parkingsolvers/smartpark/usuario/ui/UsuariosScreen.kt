@@ -16,11 +16,15 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ManageAccounts
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -37,6 +41,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import com.parkingsolvers.smartpark.auth.model.PerfilUsuario
 import com.parkingsolvers.smartpark.servidor.dto.response.ServidorResponse
@@ -45,6 +50,7 @@ import com.parkingsolvers.smartpark.ui.components.EmptyState
 import com.parkingsolvers.smartpark.ui.components.PageHeader
 import com.parkingsolvers.smartpark.ui.components.SmartParkCard
 import com.parkingsolvers.smartpark.ui.components.StatusBadge
+import com.parkingsolvers.smartpark.usuario.dto.request.AtualizarUsuarioAdminRequest
 import com.parkingsolvers.smartpark.usuario.dto.request.UsuarioRequest
 import com.parkingsolvers.smartpark.usuario.dto.response.UsuarioResponse
 
@@ -56,10 +62,12 @@ fun UsuariosScreen(
 ) {
     val usuarios by viewModel.usuarios.collectAsState()
     val servidoresSemConta by viewModel.servidoresSemConta.collectAsState()
+    val todosServidores by viewModel.todosServidores.collectAsState()
     val uiState by viewModel.uiState.collectAsState()
 
     var filtroPerfil by remember { mutableStateOf<PerfilUsuario?>(null) }
-    var mostrarDialogo by remember { mutableStateOf(false) }
+    var mostrarDialogoNovo by remember { mutableStateOf(false) }
+    var usuarioEmEdicao by remember { mutableStateOf<UsuarioResponse?>(null) }
 
     val usuariosFiltrados = remember(usuarios, filtroPerfil) {
         if (filtroPerfil == null) usuarios else usuarios.filter { it.perfil == filtroPerfil }
@@ -70,7 +78,7 @@ fun UsuariosScreen(
             FloatingActionButton(
                 onClick = {
                     viewModel.limparErrosFormulario()
-                    mostrarDialogo = true
+                    mostrarDialogoNovo = true
                 },
                 containerColor = MaterialTheme.colorScheme.primary,
                 contentColor = MaterialTheme.colorScheme.onPrimary
@@ -91,7 +99,7 @@ fun UsuariosScreen(
                     Spacer(modifier = Modifier.height(8.dp))
                     PageHeader(
                         titulo = "Contas e níveis de acesso",
-                        subtitulo = "Administração, portaria e servidores cadastrados no banco local"
+                        subtitulo = "Administração, portaria e servidores cadastrados no servidor"
                     )
                 }
             } else {
@@ -127,7 +135,7 @@ fun UsuariosScreen(
             }
 
             uiState.erroGeral?.let { erro ->
-                if (!mostrarDialogo) {
+                if (!mostrarDialogoNovo && usuarioEmEdicao == null) {
                     item {
                         Text(text = erro, color = MaterialTheme.colorScheme.error)
                     }
@@ -147,6 +155,10 @@ fun UsuariosScreen(
                     UsuarioCard(
                         usuario = usuario,
                         ehContaAtual = usuario.id == usuarioLogadoId,
+                        onEditar = {
+                            viewModel.limparErrosFormulario()
+                            usuarioEmEdicao = usuario
+                        },
                         onAlternarAtivo = { viewModel.alternarAtivo(usuario.id, usuarioLogadoId) },
                         modifier = Modifier.animateItem()
                     )
@@ -157,15 +169,35 @@ fun UsuariosScreen(
         }
     }
 
-    if (mostrarDialogo) {
+    if (mostrarDialogoNovo) {
         NovoUsuarioDialog(
             servidoresSemConta = servidoresSemConta,
             erroGeral = uiState.erroGeral,
             errosCampos = uiState.errosCampos,
-            onDismiss = { mostrarDialogo = false },
+            onDismiss = { mostrarDialogoNovo = false },
             onConfirmar = { request ->
                 viewModel.cadastrar(request) {
-                    mostrarDialogo = false
+                    mostrarDialogoNovo = false
+                }
+            }
+        )
+    }
+
+    usuarioEmEdicao?.let { usuario ->
+        val servidoresDisponiveis = remember(usuario, servidoresSemConta, todosServidores) {
+            val atual = usuario.servidorId?.let { id -> todosServidores.firstOrNull { it.id == id } }
+            (listOfNotNull(atual) + servidoresSemConta).distinctBy { it.id }
+        }
+        EditarUsuarioDialog(
+            usuario = usuario,
+            ehContaAtual = usuario.id == usuarioLogadoId,
+            servidoresDisponiveis = servidoresDisponiveis,
+            erroGeral = uiState.erroGeral,
+            errosCampos = uiState.errosCampos,
+            onDismiss = { usuarioEmEdicao = null },
+            onConfirmar = { request ->
+                viewModel.atualizarPorAdmin(usuario.id, request) {
+                    usuarioEmEdicao = null
                 }
             }
         )
@@ -176,6 +208,7 @@ fun UsuariosScreen(
 private fun UsuarioCard(
     usuario: UsuarioResponse,
     ehContaAtual: Boolean,
+    onEditar: () -> Unit,
     onAlternarAtivo: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -222,11 +255,15 @@ private fun UsuarioCard(
                 )
             }
 
-            if (!ehContaAtual) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End
-                ) {
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End
+            ) {
+                TextButton(onClick = onEditar) {
+                    Text("Editar")
+                }
+                if (!ehContaAtual) {
                     TextButton(onClick = onAlternarAtivo) {
                         Text(if (usuario.ativo) "Inativar conta" else "Reativar conta")
                     }
@@ -234,6 +271,164 @@ private fun UsuarioCard(
             }
         }
     }
+}
+
+@Composable
+private fun EditarUsuarioDialog(
+    usuario: UsuarioResponse,
+    ehContaAtual: Boolean,
+    servidoresDisponiveis: List<ServidorResponse>,
+    erroGeral: String?,
+    errosCampos: Map<String, String>,
+    onDismiss: () -> Unit,
+    onConfirmar: (AtualizarUsuarioAdminRequest) -> Unit
+) {
+    var nome by remember(usuario.id) { mutableStateOf(usuario.nome) }
+    var login by remember(usuario.id) { mutableStateOf(usuario.login) }
+    var novaSenha by remember(usuario.id) { mutableStateOf("") }
+    var confirmacaoNovaSenha by remember(usuario.id) { mutableStateOf("") }
+    var senhaVisivel by remember { mutableStateOf(false) }
+    var perfil by remember(usuario.id) { mutableStateOf(usuario.perfil) }
+    var servidorSelecionadoId by remember(usuario.id) {
+        mutableLongStateOf(usuario.servidorId ?: servidoresDisponiveis.firstOrNull()?.id ?: 0L)
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Editar conta") },
+        text = {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                if (!ehContaAtual) {
+                    Text("Nível de acesso:", style = MaterialTheme.typography.labelMedium)
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        PerfilUsuario.entries.forEach { opcao ->
+                            FilterChip(
+                                selected = perfil == opcao,
+                                onClick = { perfil = opcao },
+                                label = {
+                                    Text(
+                                        when (opcao) {
+                                            PerfilUsuario.ADMIN -> "Admin"
+                                            PerfilUsuario.PORTARIA -> "Portaria"
+                                            PerfilUsuario.SERVIDOR -> "Servidor"
+                                        }
+                                    )
+                                }
+                            )
+                        }
+                    }
+
+                    if (perfil == PerfilUsuario.SERVIDOR) {
+                        if (servidoresDisponiveis.isEmpty()) {
+                            Text(
+                                text = "Nenhum servidor disponível para vínculo.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.error
+                            )
+                        } else {
+                            Text("Servidor vinculado:", style = MaterialTheme.typography.labelMedium)
+                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                servidoresDisponiveis.forEach { servidor ->
+                                    FilterChip(
+                                        selected = servidorSelecionadoId == servidor.id,
+                                        onClick = { servidorSelecionadoId = servidor.id },
+                                        label = { Text("${servidor.nome} (${servidor.prontuario})") }
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                OutlinedTextField(
+                    value = nome,
+                    onValueChange = { nome = it },
+                    label = { Text("Nome completo") },
+                    isError = errosCampos.containsKey("nome"),
+                    supportingText = errosCampos["nome"]?.let { { Text(it) } },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(
+                    value = login,
+                    onValueChange = { login = it },
+                    label = { Text("Login ou e-mail institucional") },
+                    isError = errosCampos.containsKey("login"),
+                    supportingText = errosCampos["login"]?.let { { Text(it) } },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(
+                    value = novaSenha,
+                    onValueChange = { novaSenha = it },
+                    label = { Text("Nova senha (opcional)") },
+                    visualTransformation = if (senhaVisivel) VisualTransformation.None else PasswordVisualTransformation(),
+                    trailingIcon = {
+                        IconButton(onClick = { senhaVisivel = !senhaVisivel }) {
+                            Icon(
+                                imageVector = if (senhaVisivel) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                                contentDescription = if (senhaVisivel) "Ocultar senha" else "Mostrar senha"
+                            )
+                        }
+                    },
+                    isError = errosCampos.containsKey("novaSenha"),
+                    supportingText = (errosCampos["novaSenha"] ?: "Deixe em branco para manter a senha atual.")
+                        .let { { Text(it) } },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                if (novaSenha.isNotEmpty()) {
+                    OutlinedTextField(
+                        value = confirmacaoNovaSenha,
+                        onValueChange = { confirmacaoNovaSenha = it },
+                        label = { Text("Confirmar nova senha") },
+                        visualTransformation = if (senhaVisivel) VisualTransformation.None else PasswordVisualTransformation(),
+                        isError = errosCampos.containsKey("confirmacaoNovaSenha"),
+                        supportingText = errosCampos["confirmacaoNovaSenha"]?.let { { Text(it) } },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+
+                erroGeral?.let {
+                    Text(
+                        text = it,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    onConfirmar(
+                        AtualizarUsuarioAdminRequest(
+                            nome = nome,
+                            login = login,
+                            novaSenha = novaSenha,
+                            confirmacaoNovaSenha = confirmacaoNovaSenha,
+                            perfil = if (ehContaAtual) usuario.perfil else perfil,
+                            servidorId = if (perfil == PerfilUsuario.SERVIDOR && servidorSelecionadoId > 0L) {
+                                servidorSelecionadoId
+                            } else {
+                                null
+                            }
+                        )
+                    )
+                },
+                enabled = perfil != PerfilUsuario.SERVIDOR || servidorSelecionadoId > 0L
+            ) {
+                Text("Salvar alterações")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancelar") }
+        }
+    )
 }
 
 @Composable

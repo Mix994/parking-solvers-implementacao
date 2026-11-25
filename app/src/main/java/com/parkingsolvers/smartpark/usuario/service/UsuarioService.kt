@@ -6,6 +6,7 @@ import com.parkingsolvers.smartpark.rede.ApiErrorMapper
 import com.parkingsolvers.smartpark.rede.SincronizadorDados
 import com.parkingsolvers.smartpark.rede.SmartParkApi
 import com.parkingsolvers.smartpark.rede.fluxoRemoto
+import com.parkingsolvers.smartpark.usuario.dto.request.AtualizarUsuarioAdminRequest
 import com.parkingsolvers.smartpark.usuario.dto.request.AtualizarUsuarioRequest
 import com.parkingsolvers.smartpark.usuario.dto.request.UsuarioRequest
 import com.parkingsolvers.smartpark.usuario.dto.response.UsuarioResponse
@@ -26,6 +27,13 @@ class UsuarioService(
 
     suspend fun cadastrar(request: UsuarioRequest): UsuarioResponse =
         ApiErrorMapper.executar { api.cadastrarUsuario(request) }
+            .also { sincronizador.notificarMudanca() }
+
+    suspend fun atualizarPorAdmin(
+        usuarioId: Long,
+        request: AtualizarUsuarioAdminRequest
+    ): UsuarioResponse =
+        ApiErrorMapper.executar { api.atualizarUsuarioAdmin(usuarioId, request) }
             .also { sincronizador.notificarMudanca() }
 
     suspend fun atualizarProprioPerfil(

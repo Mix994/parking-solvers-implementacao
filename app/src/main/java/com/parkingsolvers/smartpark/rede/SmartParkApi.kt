@@ -6,6 +6,7 @@ import com.parkingsolvers.smartpark.dashboard.dto.response.DashboardOcupacaoResp
 import com.parkingsolvers.smartpark.movimentacao.dto.request.EntradaRequest
 import com.parkingsolvers.smartpark.servidor.dto.request.ServidorRequest
 import com.parkingsolvers.smartpark.servidor.dto.response.ServidorResponse
+import com.parkingsolvers.smartpark.usuario.dto.request.AtualizarUsuarioAdminRequest
 import com.parkingsolvers.smartpark.usuario.dto.request.AtualizarUsuarioRequest
 import com.parkingsolvers.smartpark.usuario.dto.request.UsuarioRequest
 import com.parkingsolvers.smartpark.usuario.dto.response.UsuarioResponse
@@ -41,6 +42,9 @@ interface SmartParkApi {
     @POST("servidores")
     suspend fun cadastrarServidor(@Body request: ServidorRequest): ServidorResponse
 
+    @PUT("servidores/{id}")
+    suspend fun atualizarServidor(@Path("id") id: Long, @Body request: ServidorRequest): ServidorResponse
+
     @PATCH("servidores/{id}/ativo")
     suspend fun alternarAtivoServidor(@Path("id") id: Long): ServidorResponse
 
@@ -60,6 +64,12 @@ interface SmartParkApi {
     @POST("usuarios")
     suspend fun cadastrarUsuario(@Body request: UsuarioRequest): UsuarioResponse
 
+    @PUT("usuarios/{id}")
+    suspend fun atualizarUsuarioAdmin(
+        @Path("id") id: Long,
+        @Body request: AtualizarUsuarioAdminRequest
+    ): UsuarioResponse
+
     @PATCH("usuarios/{id}/ativo")
     suspend fun alternarAtivoUsuario(@Path("id") id: Long): UsuarioResponse
 
@@ -75,6 +85,9 @@ interface SmartParkApi {
 
     @GET("veiculos/servidor/{servidorId}")
     suspend fun listarVeiculosPorServidor(@Path("servidorId") servidorId: Long): List<VeiculoApiResponse>
+
+    @GET("veiculos/buscar")
+    suspend fun buscarVeiculosPorTrecho(@Query("termo") termo: String): List<VeiculoApiResponse>
 
     @GET("veiculos/placa/{placa}")
     suspend fun consultarPlaca(@Path("placa") placa: String): ResultadoConsultaPlacaApiResponse

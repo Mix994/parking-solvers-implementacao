@@ -307,7 +307,8 @@ private fun GestaoAdminScreen(
                 val usuarioVm: UsuarioViewModel = viewModel(
                     factory = UsuarioViewModel.factory(
                         usuarioService = container.usuarioService,
-                        servidorService = container.servidorService
+                        servidorService = container.servidorService,
+                        authService = container.authService
                     )
                 )
                 UsuariosScreen(

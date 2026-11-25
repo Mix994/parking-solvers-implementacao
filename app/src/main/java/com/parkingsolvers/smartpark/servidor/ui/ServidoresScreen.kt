@@ -50,14 +50,15 @@ fun ServidoresScreen(
 ) {
     val servidores by viewModel.servidores.collectAsState()
     val uiState by viewModel.uiState.collectAsState()
-    var mostrarDialogo by remember { mutableStateOf(false) }
+    var mostrarDialogoNovo by remember { mutableStateOf(false) }
+    var servidorEmEdicao by remember { mutableStateOf<ServidorResponse?>(null) }
 
     Scaffold(
         floatingActionButton = {
             FloatingActionButton(
                 onClick = {
                     viewModel.limparErrosFormulario()
-                    mostrarDialogo = true
+                    mostrarDialogoNovo = true
                 },
                 containerColor = MaterialTheme.colorScheme.primary,
                 contentColor = MaterialTheme.colorScheme.onPrimary
@@ -103,6 +104,10 @@ fun ServidoresScreen(
                 items(servidores, key = { it.id }) { servidor ->
                     ServidorCard(
                         servidor = servidor,
+                        onEditar = {
+                            viewModel.limparErrosFormulario()
+                            servidorEmEdicao = servidor
+                        },
                         onAlternarAtivo = { viewModel.alternarAtivo(servidor.id) },
                         modifier = Modifier.animateItem()
                     )
@@ -113,14 +118,29 @@ fun ServidoresScreen(
         }
     }
 
-    if (mostrarDialogo) {
-        NovoServidorDialog(
+    if (mostrarDialogoNovo) {
+        ServidorFormDialog(
+            servidorInicial = null,
             erroGeral = uiState.erroGeral,
             errosCampos = uiState.errosCampos,
-            onDismiss = { mostrarDialogo = false },
+            onDismiss = { mostrarDialogoNovo = false },
             onConfirmar = { request ->
                 viewModel.cadastrar(request) {
-                    mostrarDialogo = false
+                    mostrarDialogoNovo = false
+                }
+            }
+        )
+    }
+
+    servidorEmEdicao?.let { servidor ->
+        ServidorFormDialog(
+            servidorInicial = servidor,
+            erroGeral = uiState.erroGeral,
+            errosCampos = uiState.errosCampos,
+            onDismiss = { servidorEmEdicao = null },
+            onConfirmar = { request ->
+                viewModel.atualizar(servidor.id, request) {
+                    servidorEmEdicao = null
                 }
             }
         )
@@ -130,6 +150,7 @@ fun ServidoresScreen(
 @Composable
 private fun ServidorCard(
     servidor: ServidorResponse,
+    onEditar: () -> Unit,
     onAlternarAtivo: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -168,6 +189,9 @@ private fun ServidorCard(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.End
             ) {
+                TextButton(onClick = onEditar) {
+                    Text("Editar")
+                }
                 TextButton(onClick = onAlternarAtivo) {
                     Text(if (servidor.ativo) "Inativar servidor" else "Reativar servidor")
                 }
@@ -177,21 +201,24 @@ private fun ServidorCard(
 }
 
 @Composable
-private fun NovoServidorDialog(
+private fun ServidorFormDialog(
+    servidorInicial: ServidorResponse?,
     erroGeral: String?,
     errosCampos: Map<String, String>,
     onDismiss: () -> Unit,
     onConfirmar: (ServidorRequest) -> Unit
 ) {
-    var nome by remember { mutableStateOf("") }
-    var prontuario by remember { mutableStateOf("") }
-    var email by remember { mutableStateOf("") }
-    var telefone by remember { mutableStateOf("") }
-    var setor by remember { mutableStateOf("") }
+    var nome by remember(servidorInicial?.id) { mutableStateOf(servidorInicial?.nome.orEmpty()) }
+    var prontuario by remember(servidorInicial?.id) { mutableStateOf(servidorInicial?.prontuario.orEmpty()) }
+    var email by remember(servidorInicial?.id) { mutableStateOf(servidorInicial?.email.orEmpty()) }
+    var telefone by remember(servidorInicial?.id) { mutableStateOf(servidorInicial?.telefone.orEmpty()) }
+    var setor by remember(servidorInicial?.id) { mutableStateOf(servidorInicial?.setor.orEmpty()) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Novo servidor ou docente") },
+        title = {
+            Text(if (servidorInicial == null) "Novo servidor ou docente" else "Editar servidor")
+        },
         text = {
             Column(
                 modifier = Modifier.verticalScroll(rememberScrollState()),

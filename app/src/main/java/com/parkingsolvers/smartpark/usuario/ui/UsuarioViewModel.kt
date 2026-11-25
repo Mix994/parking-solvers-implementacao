@@ -3,10 +3,12 @@ package com.parkingsolvers.smartpark.usuario.ui
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.parkingsolvers.smartpark.auth.service.AuthService
 import com.parkingsolvers.smartpark.compartilhado.exceptions.RegraDeNegocioException
 import com.parkingsolvers.smartpark.compartilhado.exceptions.ValidacaoException
 import com.parkingsolvers.smartpark.servidor.dto.response.ServidorResponse
 import com.parkingsolvers.smartpark.servidor.service.ServidorService
+import com.parkingsolvers.smartpark.usuario.dto.request.AtualizarUsuarioAdminRequest
 import com.parkingsolvers.smartpark.usuario.dto.request.UsuarioRequest
 import com.parkingsolvers.smartpark.usuario.dto.response.UsuarioResponse
 import com.parkingsolvers.smartpark.usuario.service.UsuarioService
@@ -27,15 +29,19 @@ data class UsuarioUiState(
 
 class UsuarioViewModel(
     private val usuarioService: UsuarioService,
-    servidorService: ServidorService
+    servidorService: ServidorService,
+    private val authService: AuthService? = null
 ) : ViewModel() {
 
     val usuarios: StateFlow<List<UsuarioResponse>> = usuarioService.observarTodos()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
+    val todosServidores: StateFlow<List<ServidorResponse>> = servidorService.observarTodos()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
     val servidoresSemConta: StateFlow<List<ServidorResponse>> = combine(
-        servidorService.observarTodos(),
-        usuarioService.observarTodos()
+        todosServidores,
+        usuarios
     ) { servidores, contas ->
         val idsVinculados = contas.mapNotNull { it.servidorId }.toSet()
         servidores.filter { it.ativo && it.id !in idsVinculados }
@@ -50,6 +56,26 @@ class UsuarioViewModel(
             try {
                 usuarioService.cadastrar(request)
                 _uiState.update { it.copy(mensagemFeedback = "Conta cadastrada com sucesso.") }
+                onSucesso()
+            } catch (e: ValidacaoException) {
+                _uiState.update { it.copy(errosCampos = e.errosValidacao, erroGeral = e.message) }
+            } catch (e: RegraDeNegocioException) {
+                _uiState.update { it.copy(erroGeral = e.message) }
+            }
+        }
+    }
+
+    fun atualizarPorAdmin(
+        usuarioId: Long,
+        request: AtualizarUsuarioAdminRequest,
+        onSucesso: () -> Unit
+    ) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(erroGeral = null, errosCampos = emptyMap(), mensagemFeedback = null) }
+            try {
+                val atualizado = usuarioService.atualizarPorAdmin(usuarioId, request)
+                authService?.sincronizarSessao(atualizado)
+                _uiState.update { it.copy(mensagemFeedback = "Conta atualizada com sucesso.") }
                 onSucesso()
             } catch (e: ValidacaoException) {
                 _uiState.update { it.copy(errosCampos = e.errosValidacao, erroGeral = e.message) }
@@ -79,11 +105,12 @@ class UsuarioViewModel(
     companion object {
         fun factory(
             usuarioService: UsuarioService,
-            servidorService: ServidorService
+            servidorService: ServidorService,
+            authService: AuthService? = null
         ): ViewModelProvider.Factory = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>): T =
-                UsuarioViewModel(usuarioService, servidorService) as T
+                UsuarioViewModel(usuarioService, servidorService, authService) as T
         }
     }
 }
