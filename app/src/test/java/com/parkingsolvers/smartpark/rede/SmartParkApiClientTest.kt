@@ -12,6 +12,7 @@ import com.parkingsolvers.smartpark.movimentacao.model.Turno
 import com.parkingsolvers.smartpark.movimentacao.service.MovimentacaoService
 import com.parkingsolvers.smartpark.servidor.dto.request.ServidorRequest
 import com.parkingsolvers.smartpark.servidor.service.ServidorService
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
@@ -174,6 +175,50 @@ class SmartParkApiClientTest {
         assertEquals("/auth/refresh", rRefresh.path)
         val rRetry = server.takeRequest()
         assertEquals("Bearer tok-novo", rRetry.getHeader("Authorization"))
+    }
+
+    @Test
+    fun `observarMinhasAbertas consulta endpoint do servidor com bearer e mapeia resposta`() = runTest {
+        store.salvar(
+            CredenciaisSessao(
+                accessToken = "tok-servidor",
+                refreshToken = "tok-refresh",
+                sessao = com.parkingsolvers.smartpark.auth.model.UsuarioSessao(2, "Ana", "SP1234", PerfilUsuario.SERVIDOR, servidorId = 10L)
+            )
+        )
+        server.enqueue(
+            MockResponse().setResponseCode(200).setBody(
+                """
+                [
+                  {
+                    "id": 99,
+                    "veiculoId": 7,
+                    "placa": "ABC1D23",
+                    "modeloCor": "Onix • Prata",
+                    "servidorNome": "Ana",
+                    "autorizado": true,
+                    "dataHoraEntrada": "2026-03-10T15:00:00Z",
+                    "dataHoraSaida": null,
+                    "turno": "TARDE",
+                    "tipoVaga": "CARREGAMENTO_ELETRICO",
+                    "observacao": "Estacionamento simulado pelo servidor",
+                    "emAberto": true
+                  }
+                ]
+                """.trimIndent()
+            )
+        )
+
+        val movService = MovimentacaoService(api, sincronizador)
+        val lista = movService.observarMinhasAbertas().first()
+        assertEquals(1, lista.size)
+        assertEquals(99L, lista.first().id)
+        assertEquals(TipoVaga.CARREGAMENTO_ELETRICO, lista.first().tipoVaga)
+        assertTrue(lista.first().emAberto)
+
+        val req = server.takeRequest()
+        assertEquals("/movimentacoes/minhas-abertas", req.path)
+        assertEquals("Bearer tok-servidor", req.getHeader("Authorization"))
     }
 
     @Test

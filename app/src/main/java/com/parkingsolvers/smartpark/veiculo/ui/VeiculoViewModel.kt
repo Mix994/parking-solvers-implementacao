@@ -5,6 +5,13 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.parkingsolvers.smartpark.compartilhado.exceptions.RegraDeNegocioException
 import com.parkingsolvers.smartpark.compartilhado.exceptions.ValidacaoException
+import com.parkingsolvers.smartpark.dashboard.dto.response.DashboardOcupacaoResponse
+import com.parkingsolvers.smartpark.dashboard.model.PeriodoDashboard
+import com.parkingsolvers.smartpark.dashboard.service.DashboardService
+import com.parkingsolvers.smartpark.movimentacao.dto.request.EntradaRequest
+import com.parkingsolvers.smartpark.movimentacao.dto.response.MovimentacaoResponse
+import com.parkingsolvers.smartpark.movimentacao.model.TipoVaga
+import com.parkingsolvers.smartpark.movimentacao.service.MovimentacaoService
 import com.parkingsolvers.smartpark.servidor.dto.response.ServidorResponse
 import com.parkingsolvers.smartpark.servidor.service.ServidorService
 import com.parkingsolvers.smartpark.veiculo.dto.request.VeiculoRequest
@@ -22,12 +29,15 @@ import kotlinx.coroutines.launch
 data class VeiculoUiState(
     val mensagemFeedback: String? = null,
     val erroGeral: String? = null,
-    val errosCampos: Map<String, String> = emptyMap()
+    val errosCampos: Map<String, String> = emptyMap(),
+    val processandoSimulacao: Boolean = false
 )
 
 class VeiculoViewModel(
     private val veiculoService: VeiculoService,
     servidorService: ServidorService,
+    private val movimentacaoService: MovimentacaoService,
+    dashboardService: DashboardService,
     servidorIdFiltro: Long?
 ) : ViewModel() {
 
@@ -46,6 +56,22 @@ class VeiculoViewModel(
             servidorService.observarTodos()
         }
     ).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    val movimentacoesAbertas: StateFlow<List<MovimentacaoResponse>> = (
+        if (servidorIdFiltro != null) {
+            movimentacaoService.observarMinhasAbertas()
+        } else {
+            flowOf(emptyList())
+        }
+    ).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    val ocupacaoAtual: StateFlow<DashboardOcupacaoResponse?> = (
+        if (servidorIdFiltro != null) {
+            dashboardService.observarDashboard(flowOf(PeriodoDashboard.HOJE))
+        } else {
+            flowOf(null)
+        }
+    ).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     private val _uiState = MutableStateFlow(VeiculoUiState())
     val uiState: StateFlow<VeiculoUiState> = _uiState.asStateFlow()
@@ -77,6 +103,48 @@ class VeiculoViewModel(
         }
     }
 
+    fun simularEstacionamento(placa: String, tipoVaga: TipoVaga, onSucesso: () -> Unit) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(processandoSimulacao = true, erroGeral = null, mensagemFeedback = null) }
+            try {
+                movimentacaoService.registrarEntrada(
+                    EntradaRequest(
+                        placa = placa,
+                        tipoVaga = tipoVaga,
+                        observacao = "Estacionamento simulado pelo servidor",
+                        permitirNaoAutorizado = false
+                    )
+                )
+                _uiState.update {
+                    it.copy(
+                        processandoSimulacao = false,
+                        mensagemFeedback = "Simulação registrada em ${tipoVaga.label}. Visível na Portaria."
+                    )
+                }
+                onSucesso()
+            } catch (e: RegraDeNegocioException) {
+                _uiState.update { it.copy(processandoSimulacao = false, erroGeral = e.message) }
+            }
+        }
+    }
+
+    fun simularSaida(movimentacaoId: Long) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(processandoSimulacao = true, erroGeral = null, mensagemFeedback = null) }
+            try {
+                movimentacaoService.registrarSaida(movimentacaoId)
+                _uiState.update {
+                    it.copy(
+                        processandoSimulacao = false,
+                        mensagemFeedback = "Saída simulada registrada. Vaga liberada."
+                    )
+                }
+            } catch (e: RegraDeNegocioException) {
+                _uiState.update { it.copy(processandoSimulacao = false, erroGeral = e.message) }
+            }
+        }
+    }
+
     fun limparErrosFormulario() {
         _uiState.update { it.copy(erroGeral = null, errosCampos = emptyMap()) }
     }
@@ -89,11 +157,19 @@ class VeiculoViewModel(
         fun factory(
             veiculoService: VeiculoService,
             servidorService: ServidorService,
+            movimentacaoService: MovimentacaoService,
+            dashboardService: DashboardService,
             servidorIdFiltro: Long?
         ): ViewModelProvider.Factory = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>): T =
-                VeiculoViewModel(veiculoService, servidorService, servidorIdFiltro) as T
+                VeiculoViewModel(
+                    veiculoService = veiculoService,
+                    servidorService = servidorService,
+                    movimentacaoService = movimentacaoService,
+                    dashboardService = dashboardService,
+                    servidorIdFiltro = servidorIdFiltro
+                ) as T
         }
     }
 }

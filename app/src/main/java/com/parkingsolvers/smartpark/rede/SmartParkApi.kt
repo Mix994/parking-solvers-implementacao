@@ -105,6 +105,9 @@ interface SmartParkApi {
     @GET("movimentacoes/no-estacionamento")
     suspend fun listarNoEstacionamento(): List<MovimentacaoApiResponse>
 
+    @GET("movimentacoes/minhas-abertas")
+    suspend fun listarMinhasMovimentacoesAbertas(): List<MovimentacaoApiResponse>
+
     @POST("movimentacoes/entrada")
     suspend fun registrarEntradaMovimentacao(@Body request: EntradaRequest): MovimentacaoApiResponse
 

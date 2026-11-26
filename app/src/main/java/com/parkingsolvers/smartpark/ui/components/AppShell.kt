@@ -237,6 +237,8 @@ fun AppShell(
                         factory = VeiculoViewModel.factory(
                             veiculoService = container.veiculoService,
                             servidorService = container.servidorService,
+                            movimentacaoService = container.movimentacaoService,
+                            dashboardService = container.dashboardService,
                             servidorIdFiltro = servidorFiltro
                         )
                     )

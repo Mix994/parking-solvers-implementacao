@@ -17,6 +17,11 @@ class MovimentacaoService(
             api.listarNoEstacionamento().map { it.paraDominio() }
         }
 
+    fun observarMinhasAbertas(): Flow<List<MovimentacaoResponse>> =
+        fluxoRemoto(sincronizador, emptyList()) {
+            api.listarMinhasMovimentacoesAbertas().map { it.paraDominio() }
+        }
+
     fun observarHistorico(): Flow<List<MovimentacaoResponse>> =
         fluxoRemoto(sincronizador, emptyList()) {
             api.listarMovimentacoes().map { it.paraDominio() }

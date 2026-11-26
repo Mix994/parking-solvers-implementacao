@@ -1,5 +1,6 @@
 package com.parkingsolvers.smartpark.veiculo.ui
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -8,22 +9,34 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ExitToApp
+import androidx.compose.material.icons.filled.Accessible
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.DirectionsCar
+import androidx.compose.material.icons.filled.EvStation
+import androidx.compose.material.icons.filled.LocalParking
+import androidx.compose.material.icons.filled.VerifiedUser
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -36,8 +49,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.parkingsolvers.smartpark.compartilhado.util.Formatadores
+import com.parkingsolvers.smartpark.dashboard.dto.response.DashboardOcupacaoResponse
+import com.parkingsolvers.smartpark.movimentacao.dto.response.MovimentacaoResponse
+import com.parkingsolvers.smartpark.movimentacao.model.TipoVaga
 import com.parkingsolvers.smartpark.servidor.dto.response.ServidorResponse
 import com.parkingsolvers.smartpark.ui.components.BadgeTone
 import com.parkingsolvers.smartpark.ui.components.EmptyState
@@ -56,8 +74,11 @@ fun VeiculosScreen(
 ) {
     val veiculos by viewModel.veiculos.collectAsState()
     val servidores by viewModel.servidores.collectAsState()
+    val movimentacoesAbertas by viewModel.movimentacoesAbertas.collectAsState()
+    val ocupacaoAtual by viewModel.ocupacaoAtual.collectAsState()
     val uiState by viewModel.uiState.collectAsState()
     var mostrarDialogo by remember { mutableStateOf(false) }
+    var veiculoParaSimular by remember { mutableStateOf<VeiculoResponse?>(null) }
 
     Scaffold(
         floatingActionButton = {
@@ -84,13 +105,25 @@ fun VeiculosScreen(
                 Spacer(modifier = Modifier.height(8.dp))
                 PageHeader(
                     titulo = if (servidorIdFixo != null) "Meus veículos" else "Veículos cadastrados",
-                    subtitulo = "Veículos permanentes e autorizações temporárias com prazo de validade"
+                    subtitulo = if (servidorIdFixo != null) {
+                        "Gerencie seus veículos ou simule estacionamento para testar o painel da portaria"
+                    } else {
+                        "Veículos permanentes e autorizações temporárias com prazo de validade"
+                    }
                 )
             }
 
             uiState.mensagemFeedback?.let { msg ->
                 item {
                     Text(text = msg, color = MaterialTheme.colorScheme.primary)
+                }
+            }
+
+            if (!mostrarDialogo && veiculoParaSimular == null) {
+                uiState.erroGeral?.let { erro ->
+                    item {
+                        Text(text = erro, color = MaterialTheme.colorScheme.error)
+                    }
                 }
             }
 
@@ -104,9 +137,22 @@ fun VeiculosScreen(
                 }
             } else {
                 items(veiculos, key = { it.id }) { veiculo ->
+                    val movimentacaoAberta = if (servidorIdFixo != null) {
+                        movimentacoesAbertas.firstOrNull { it.veiculoId == veiculo.id || it.placa == veiculo.placa }
+                    } else {
+                        null
+                    }
                     VeiculoCard(
                         veiculo = veiculo,
+                        permitirSimulacao = servidorIdFixo != null,
+                        movimentacaoAberta = movimentacaoAberta,
+                        processandoSimulacao = uiState.processandoSimulacao,
                         onAlternarAtivo = { viewModel.alternarAtivo(veiculo.id) },
+                        onAbrirSimulacao = {
+                            viewModel.limparErrosFormulario()
+                            veiculoParaSimular = veiculo
+                        },
+                        onSimularSaida = { movId -> viewModel.simularSaida(movId) },
                         modifier = Modifier.animateItem()
                     )
                 }
@@ -130,12 +176,32 @@ fun VeiculosScreen(
             }
         )
     }
+
+    veiculoParaSimular?.let { veiculo ->
+        SimularEstacionamentoDialog(
+            veiculo = veiculo,
+            ocupacaoAtual = ocupacaoAtual,
+            processando = uiState.processandoSimulacao,
+            erroGeral = uiState.erroGeral,
+            onDismiss = { veiculoParaSimular = null },
+            onConfirmar = { tipoVaga ->
+                viewModel.simularEstacionamento(veiculo.placa, tipoVaga) {
+                    veiculoParaSimular = null
+                }
+            }
+        )
+    }
 }
 
 @Composable
 private fun VeiculoCard(
     veiculo: VeiculoResponse,
+    permitirSimulacao: Boolean,
+    movimentacaoAberta: MovimentacaoResponse?,
+    processandoSimulacao: Boolean,
     onAlternarAtivo: () -> Unit,
+    onAbrirSimulacao: () -> Unit,
+    onSimularSaida: (Long) -> Unit,
     modifier: Modifier = Modifier
 ) {
     SmartParkCard(modifier = modifier.fillMaxWidth()) {
@@ -195,18 +261,254 @@ private fun VeiculoCard(
                 }
             }
 
+            if (movimentacaoAberta != null) {
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(8.dp),
+                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 10.dp, vertical = 8.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Estacionado • ${movimentacaoAberta.tipoVaga.label} (desde ${Formatadores.formatarHora(movimentacaoAberta.dataHoraEntradaMillis)})",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                            modifier = Modifier.weight(1f)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        StatusBadge(texto = "No pátio", tone = BadgeTone.SUCESSO)
+                    }
+                }
+            }
+
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 TextButton(onClick = onAlternarAtivo) {
                     Text(if (veiculo.ativo) "Inativar veículo" else "Reativar veículo")
                 }
+
+                if (permitirSimulacao) {
+                    if (movimentacaoAberta != null) {
+                        OutlinedButton(
+                            onClick = { onSimularSaida(movimentacaoAberta.id) },
+                            enabled = !processandoSimulacao
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ExitToApp,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Sair da vaga")
+                        }
+                    } else {
+                        FilledTonalButton(
+                            onClick = onAbrirSimulacao,
+                            enabled = veiculo.ativo && veiculo.validoNoMomento && !processandoSimulacao
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.LocalParking,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Simular vaga")
+                        }
+                    }
+                }
             }
         }
     }
+}
+
+@Composable
+private fun SimularEstacionamentoDialog(
+    veiculo: VeiculoResponse,
+    ocupacaoAtual: DashboardOcupacaoResponse?,
+    processando: Boolean,
+    erroGeral: String?,
+    onDismiss: () -> Unit,
+    onConfirmar: (TipoVaga) -> Unit
+) {
+    val opcoesDisponibilidade = remember(ocupacaoAtual) {
+        TipoVaga.entries.map { tipo ->
+            val (livres, capacidade, textoDisponibilidade) = disponibilidadeParaTipo(tipo, ocupacaoAtual)
+            val lotado = capacidade != null && capacidade > 0 && livres != null && livres <= 0
+            Triple(tipo, textoDisponibilidade, lotado)
+        }
+    }
+
+    var tipoSelecionado by remember(veiculo.id) {
+        mutableStateOf(
+            opcoesDisponibilidade.firstOrNull { !it.third }?.first ?: TipoVaga.COMUM
+        )
+    }
+
+    AlertDialog(
+        onDismissRequest = { if (!processando) onDismiss() },
+        title = { Text("Simular estacionamento") },
+        text = {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    PlacaMercosulChip(placa = veiculo.placa)
+                    Column {
+                        Text(
+                            text = "${veiculo.modelo} (${veiculo.cor})",
+                            style = MaterialTheme.typography.titleSmall
+                        )
+                        Text(
+                            text = "Aparecerá em tempo real na Portaria e no Painel.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+
+                Text(
+                    text = "Escolha em qual tipo de vaga você estacionou:",
+                    style = MaterialTheme.typography.labelMedium
+                )
+
+                opcoesDisponibilidade.forEach { (tipo, disponibilidade, lotado) ->
+                    val selecionado = tipoSelecionado == tipo
+                    Surface(
+                        onClick = { if (!lotado) tipoSelecionado = tipo },
+                        enabled = !lotado && !processando,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(10.dp),
+                        color = if (selecionado) {
+                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f)
+                        } else {
+                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
+                        },
+                        border = BorderStroke(
+                            width = if (selecionado) 1.5.dp else 1.dp,
+                            color = if (selecionado) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.outlineVariant
+                            }
+                        )
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 10.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            RadioButton(
+                                selected = selecionado,
+                                onClick = { if (!lotado) tipoSelecionado = tipo },
+                                enabled = !lotado && !processando
+                            )
+                            Icon(
+                                imageVector = iconePorTipoVaga(tipo),
+                                contentDescription = null,
+                                tint = if (lotado) {
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                } else {
+                                    MaterialTheme.colorScheme.primary
+                                },
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = tipo.label,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Medium
+                                )
+                                Text(
+                                    text = disponibilidade,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = if (lotado) {
+                                        MaterialTheme.colorScheme.error
+                                    } else {
+                                        MaterialTheme.colorScheme.onSurfaceVariant
+                                    }
+                                )
+                            }
+                            if (lotado) {
+                                StatusBadge(texto = "Lotado", tone = BadgeTone.ALERTA)
+                            }
+                        }
+                    }
+                }
+
+                erroGeral?.let {
+                    Text(
+                        text = it,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = { onConfirmar(tipoSelecionado) },
+                enabled = !processando && opcoesDisponibilidade.any { it.first == tipoSelecionado && !it.third }
+            ) {
+                Text(if (processando) "Registrando..." else "Confirmar entrada")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss, enabled = !processando) {
+                Text("Cancelar")
+            }
+        }
+    )
+}
+
+private fun disponibilidadeParaTipo(
+    tipo: TipoVaga,
+    ocupacao: DashboardOcupacaoResponse?
+): Triple<Int?, Int?, String> {
+    if (ocupacao == null) {
+        return Triple(null, null, "Disponibilidade em atualização")
+    }
+    return when (tipo) {
+        TipoVaga.COMUM -> Triple(
+            ocupacao.vagasComunsLivresAgora,
+            ocupacao.capacidadeComuns,
+            "${ocupacao.vagasComunsLivresAgora} de ${ocupacao.capacidadeComuns} vagas livres"
+        )
+        TipoVaga.CARREGAMENTO_ELETRICO -> Triple(
+            ocupacao.vagasEletricasLivresAgora,
+            ocupacao.capacidadeCarregamentoEletrico,
+            "${ocupacao.vagasEletricasLivresAgora} de ${ocupacao.capacidadeCarregamentoEletrico} estações livres"
+        )
+        TipoVaga.EXCLUSIVA_PCD,
+        TipoVaga.EXCLUSIVA_IDOSO,
+        TipoVaga.EXCLUSIVA_OFICIAL -> Triple(
+            ocupacao.vagasExclusivasLivresAgora,
+            ocupacao.capacidadeExclusivas,
+            "${ocupacao.vagasExclusivasLivresAgora} de ${ocupacao.capacidadeExclusivas} vagas exclusivas livres"
+        )
+    }
+}
+
+private fun iconePorTipoVaga(tipo: TipoVaga): ImageVector = when (tipo) {
+    TipoVaga.COMUM -> Icons.Default.DirectionsCar
+    TipoVaga.CARREGAMENTO_ELETRICO -> Icons.Default.EvStation
+    TipoVaga.EXCLUSIVA_PCD, TipoVaga.EXCLUSIVA_IDOSO -> Icons.Default.Accessible
+    TipoVaga.EXCLUSIVA_OFICIAL -> Icons.Default.VerifiedUser
 }
 
 @Composable

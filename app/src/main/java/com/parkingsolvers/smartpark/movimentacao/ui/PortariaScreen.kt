@@ -475,6 +475,13 @@ private fun MovimentacaoAtivaCard(
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+                if (movimentacao.observacao.isNotBlank()) {
+                    Text(
+                        text = movimentacao.observacao,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
             }
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
             Row(
