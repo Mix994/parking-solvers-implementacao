@@ -1,7 +1,6 @@
 package com.parkingsolvers.smartpark.movimentacao.ui
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -9,6 +8,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -40,6 +40,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -52,10 +53,13 @@ import com.parkingsolvers.smartpark.movimentacao.dto.response.MovimentacaoRespon
 import com.parkingsolvers.smartpark.movimentacao.model.TipoVaga
 import com.parkingsolvers.smartpark.ui.components.BadgeTone
 import com.parkingsolvers.smartpark.ui.components.EmptyState
+import com.parkingsolvers.smartpark.ui.components.FeedbackAnimado
 import com.parkingsolvers.smartpark.ui.components.PageHeader
 import com.parkingsolvers.smartpark.ui.components.PlacaMercosulChip
 import com.parkingsolvers.smartpark.ui.components.SmartParkCard
+import com.parkingsolvers.smartpark.ui.components.SmartParkMotion
 import com.parkingsolvers.smartpark.ui.components.StatusBadge
+import com.parkingsolvers.smartpark.ui.components.escalaAoPressionar
 import com.parkingsolvers.smartpark.veiculo.dto.response.ResultadoConsultaPlaca
 import com.parkingsolvers.smartpark.veiculo.dto.response.StatusAutorizacao
 import com.parkingsolvers.smartpark.veiculo.dto.response.VeiculoResponse
@@ -119,9 +123,12 @@ fun PortariaScreen(
                             modifier = Modifier.weight(1f)
                         )
                         Spacer(modifier = Modifier.width(8.dp))
+                        val buscarInteraction = remember { MutableInteractionSource() }
                         Button(
                             onClick = { viewModel.consultarPlaca() },
-                            enabled = podeConsultar
+                            enabled = podeConsultar,
+                            interactionSource = buscarInteraction,
+                            modifier = Modifier.escalaAoPressionar(buscarInteraction)
                         ) {
                             Icon(Icons.Default.Search, contentDescription = "Consultar placa")
                         }
@@ -129,8 +136,10 @@ fun PortariaScreen(
 
                     AnimatedVisibility(
                         visible = correspondencias.isNotEmpty() && uiState.resultadoConsulta == null,
-                        enter = fadeIn(tween(180)) + expandVertically(tween(200)),
-                        exit = fadeOut(tween(140)) + shrinkVertically(tween(160))
+                        enter = fadeIn(tween(220, easing = SmartParkMotion.CurvaPadrao)) +
+                            expandVertically(tween(240, easing = SmartParkMotion.CurvaPadrao)),
+                        exit = fadeOut(tween(160, easing = SmartParkMotion.CurvaPadrao)) +
+                            shrinkVertically(tween(180, easing = SmartParkMotion.CurvaPadrao))
                     ) {
                         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                             Text(
@@ -162,26 +171,13 @@ fun PortariaScreen(
                             FilterChip(
                                 selected = uiState.tipoVagaSelecionado == tipo,
                                 onClick = { viewModel.selecionarTipoVaga(tipo) },
-                                label = { Text(tipo.label) }
+                                label = { Text(tipo.label, maxLines = 1, softWrap = false) }
                             )
                         }
                     }
 
-                    uiState.erro?.let { erro ->
-                        Text(
-                            text = erro,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.error
-                        )
-                    }
-
-                    uiState.mensagemFeedback?.let { msg ->
-                        Text(
-                            text = msg,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                    }
+                    FeedbackAnimado(mensagem = uiState.erro, ehErro = true)
+                    FeedbackAnimado(mensagem = uiState.mensagemFeedback, ehErro = false)
                 }
             }
         }
@@ -190,8 +186,10 @@ fun PortariaScreen(
             val resultado = uiState.resultadoConsulta
             AnimatedVisibility(
                 visible = resultado != null,
-                enter = fadeIn(tween(240, easing = FastOutSlowInEasing)) + expandVertically(tween(260)),
-                exit = fadeOut(tween(160)) + shrinkVertically(tween(200))
+                enter = fadeIn(tween(260, easing = SmartParkMotion.CurvaPadrao)) +
+                    expandVertically(tween(280, easing = SmartParkMotion.CurvaPadrao)),
+                exit = fadeOut(tween(180, easing = SmartParkMotion.CurvaPadrao)) +
+                    shrinkVertically(tween(220, easing = SmartParkMotion.CurvaPadrao))
             ) {
                 if (resultado != null) {
                     val movimentacaoAberta = noEstacionamento.firstOrNull { it.placa == resultado.placaConsultada }
@@ -265,9 +263,13 @@ private fun SugestaoPlacaItem(
     veiculo: VeiculoResponse,
     onClick: () -> Unit
 ) {
+    val itemInteraction = remember { MutableInteractionSource() }
     Surface(
         onClick = onClick,
-        modifier = Modifier.fillMaxWidth(),
+        interactionSource = itemInteraction,
+        modifier = Modifier
+            .fillMaxWidth()
+            .escalaAoPressionar(itemInteraction, 0.98f),
         shape = RoundedCornerShape(10.dp),
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
@@ -276,7 +278,7 @@ private fun SugestaoPlacaItem(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 12.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Row(
@@ -319,7 +321,7 @@ private fun HistoricoItem(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 14.dp, vertical = 10.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(modifier = Modifier.weight(1f)) {
@@ -377,10 +379,11 @@ private fun ResultadoConsultaCard(
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 PlacaMercosulChip(placa = resultado.placaConsultada, destaque = true)
+                Spacer(modifier = Modifier.weight(1f))
                 StatusBadge(
                     texto = resultado.status.label,
                     tone = if (resultado.autorizado) BadgeTone.SUCESSO else BadgeTone.ERRO
@@ -403,33 +406,49 @@ private fun ResultadoConsultaCard(
                         text = "Veículo no pátio desde ${Formatadores.formatarHora(movimentacaoAberta.dataHoraEntradaMillis)}.",
                         style = MaterialTheme.typography.bodyMedium
                     )
+                    val acaoInteraction = remember { MutableInteractionSource() }
                     Button(
                         onClick = { onRegistrarSaida(movimentacaoAberta.id) },
-                        modifier = Modifier.fillMaxWidth()
+                        interactionSource = acaoInteraction,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .escalaAoPressionar(acaoInteraction)
                     ) {
                         Text("Dar baixa na saída")
                     }
                 }
                 resultado.autorizado -> {
+                    val acaoInteraction = remember { MutableInteractionSource() }
                     Button(
                         onClick = { onRegistrarEntrada(false) },
-                        modifier = Modifier.fillMaxWidth()
+                        interactionSource = acaoInteraction,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .escalaAoPressionar(acaoInteraction)
                     ) {
                         Text("Liberar entrada autorizada")
                     }
                 }
                 else -> {
                     if (resultado.status == StatusAutorizacao.NAO_CADASTRADO) {
+                        val visInteraction = remember { MutableInteractionSource() }
                         Button(
                             onClick = onCadastrarVisitante,
-                            modifier = Modifier.fillMaxWidth()
+                            interactionSource = visInteraction,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .escalaAoPressionar(visInteraction)
                         ) {
                             Text("Registrar como visitante externo")
                         }
                     }
+                    val excInteraction = remember { MutableInteractionSource() }
                     OutlinedButton(
                         onClick = { onRegistrarEntrada(true) },
-                        modifier = Modifier.fillMaxWidth()
+                        interactionSource = excInteraction,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .escalaAoPressionar(excInteraction)
                     ) {
                         Text("Liberar entrada excepcional")
                     }
@@ -452,10 +471,11 @@ private fun MovimentacaoAtivaCard(
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 PlacaMercosulChip(placa = movimentacao.placa)
+                Spacer(modifier = Modifier.weight(1f))
                 StatusBadge(
                     texto = movimentacao.tipoVaga.label,
                     tone = when {
@@ -492,10 +512,12 @@ private fun MovimentacaoAtivaCard(
                 Text(
                     text = "Entrada às ${Formatadores.formatarHora(movimentacao.dataHoraEntradaMillis)} (${movimentacao.turno.label})",
                     style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(1f)
                 )
+                Spacer(modifier = Modifier.width(8.dp))
                 TextButton(onClick = onRegistrarSaida) {
-                    Text("Dar baixa na saída")
+                    Text("Dar baixa na saída", maxLines = 1, softWrap = false)
                 }
             }
         }

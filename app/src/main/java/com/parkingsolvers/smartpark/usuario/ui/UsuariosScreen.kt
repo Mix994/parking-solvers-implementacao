@@ -1,6 +1,7 @@
 package com.parkingsolvers.smartpark.usuario.ui
 
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -9,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -47,9 +49,11 @@ import com.parkingsolvers.smartpark.auth.model.PerfilUsuario
 import com.parkingsolvers.smartpark.servidor.dto.response.ServidorResponse
 import com.parkingsolvers.smartpark.ui.components.BadgeTone
 import com.parkingsolvers.smartpark.ui.components.EmptyState
+import com.parkingsolvers.smartpark.ui.components.FeedbackAnimado
 import com.parkingsolvers.smartpark.ui.components.PageHeader
 import com.parkingsolvers.smartpark.ui.components.SmartParkCard
 import com.parkingsolvers.smartpark.ui.components.StatusBadge
+import com.parkingsolvers.smartpark.ui.components.escalaAoPressionar
 import com.parkingsolvers.smartpark.usuario.dto.request.AtualizarUsuarioAdminRequest
 import com.parkingsolvers.smartpark.usuario.dto.request.UsuarioRequest
 import com.parkingsolvers.smartpark.usuario.dto.response.UsuarioResponse
@@ -75,13 +79,16 @@ fun UsuariosScreen(
 
     Scaffold(
         floatingActionButton = {
+            val fabInteraction = remember { MutableInteractionSource() }
             FloatingActionButton(
                 onClick = {
                     viewModel.limparErrosFormulario()
                     mostrarDialogoNovo = true
                 },
+                interactionSource = fabInteraction,
                 containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary
+                contentColor = MaterialTheme.colorScheme.onPrimary,
+                modifier = Modifier.escalaAoPressionar(fabInteraction, 0.93f)
             ) {
                 Icon(Icons.Default.Add, contentDescription = "Criar conta")
             }
@@ -128,18 +135,13 @@ fun UsuariosScreen(
                 }
             }
 
-            uiState.mensagemFeedback?.let { msg ->
-                item {
-                    Text(text = msg, color = MaterialTheme.colorScheme.primary)
-                }
+            item {
+                FeedbackAnimado(mensagem = uiState.mensagemFeedback)
             }
 
-            uiState.erroGeral?.let { erro ->
-                if (!mostrarDialogoNovo && usuarioEmEdicao == null) {
-                    item {
-                        Text(text = erro, color = MaterialTheme.colorScheme.error)
-                    }
-                }
+            item {
+                val erroVisivel = if (!mostrarDialogoNovo && usuarioEmEdicao == null) uiState.erroGeral else null
+                FeedbackAnimado(mensagem = erroVisivel, ehErro = true)
             }
 
             if (usuariosFiltrados.isEmpty()) {
@@ -234,6 +236,7 @@ private fun UsuarioCard(
                     fontWeight = FontWeight.SemiBold,
                     modifier = Modifier.weight(1f)
                 )
+                Spacer(modifier = Modifier.width(8.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     StatusBadge(texto = usuario.perfil.label, tone = perfilTone)
                     StatusBadge(
@@ -303,18 +306,25 @@ private fun EditarUsuarioDialog(
             ) {
                 if (!ehContaAtual) {
                     Text("Nível de acesso:", style = MaterialTheme.typography.labelMedium)
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
                         PerfilUsuario.entries.forEach { opcao ->
                             FilterChip(
                                 selected = perfil == opcao,
                                 onClick = { perfil = opcao },
                                 label = {
                                     Text(
-                                        when (opcao) {
+                                        text = when (opcao) {
                                             PerfilUsuario.ADMIN -> "Admin"
                                             PerfilUsuario.PORTARIA -> "Portaria"
                                             PerfilUsuario.SERVIDOR -> "Servidor"
-                                        }
+                                        },
+                                        maxLines = 1,
+                                        softWrap = false
                                     )
                                 }
                             )
@@ -393,17 +403,14 @@ private fun EditarUsuarioDialog(
                     )
                 }
 
-                erroGeral?.let {
-                    Text(
-                        text = it,
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                }
+                FeedbackAnimado(mensagem = erroGeral, ehErro = true)
             }
         },
         confirmButton = {
+            val salvarInteraction = remember { MutableInteractionSource() }
             Button(
+                interactionSource = salvarInteraction,
+                modifier = Modifier.escalaAoPressionar(salvarInteraction),
                 onClick = {
                     onConfirmar(
                         AtualizarUsuarioAdminRequest(
@@ -457,18 +464,25 @@ private fun NovoUsuarioDialog(
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Text("Nível de acesso:", style = MaterialTheme.typography.labelMedium)
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
                     PerfilUsuario.entries.forEach { opcao ->
                         FilterChip(
                             selected = perfil == opcao,
                             onClick = { perfil = opcao },
                             label = {
                                 Text(
-                                    when (opcao) {
+                                    text = when (opcao) {
                                         PerfilUsuario.ADMIN -> "Admin"
                                         PerfilUsuario.PORTARIA -> "Portaria"
                                         PerfilUsuario.SERVIDOR -> "Servidor"
-                                    }
+                                    },
+                                    maxLines = 1,
+                                    softWrap = false
                                 )
                             }
                         )
@@ -539,17 +553,14 @@ private fun NovoUsuarioDialog(
                     modifier = Modifier.fillMaxWidth()
                 )
 
-                erroGeral?.let {
-                    Text(
-                        text = it,
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                }
+                FeedbackAnimado(mensagem = erroGeral, ehErro = true)
             }
         },
         confirmButton = {
+            val salvarInteraction = remember { MutableInteractionSource() }
             Button(
+                interactionSource = salvarInteraction,
+                modifier = Modifier.escalaAoPressionar(salvarInteraction),
                 onClick = {
                     onConfirmar(
                         UsuarioRequest(

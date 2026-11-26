@@ -1,6 +1,7 @@
 package com.parkingsolvers.smartpark.visitante.ui
 
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -9,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -44,10 +46,12 @@ import com.parkingsolvers.smartpark.compartilhado.util.Formatadores
 import com.parkingsolvers.smartpark.movimentacao.model.TipoVaga
 import com.parkingsolvers.smartpark.ui.components.BadgeTone
 import com.parkingsolvers.smartpark.ui.components.EmptyState
+import com.parkingsolvers.smartpark.ui.components.FeedbackAnimado
 import com.parkingsolvers.smartpark.ui.components.PageHeader
 import com.parkingsolvers.smartpark.ui.components.PlacaMercosulChip
 import com.parkingsolvers.smartpark.ui.components.SmartParkCard
 import com.parkingsolvers.smartpark.ui.components.StatusBadge
+import com.parkingsolvers.smartpark.ui.components.escalaAoPressionar
 import com.parkingsolvers.smartpark.visitante.dto.request.VisitanteRequest
 import com.parkingsolvers.smartpark.visitante.dto.response.VisitanteResponse
 
@@ -83,14 +87,17 @@ fun VisitantesScreen(
 
     Scaffold(
         floatingActionButton = {
+            val fabInteraction = remember { MutableInteractionSource() }
             FloatingActionButton(
                 onClick = {
                     placaPrePreenchida = ""
                     viewModel.limparErrosFormulario()
                     mostrarDialogo = true
                 },
+                interactionSource = fabInteraction,
                 containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary
+                contentColor = MaterialTheme.colorScheme.onPrimary,
+                modifier = Modifier.escalaAoPressionar(fabInteraction, 0.93f)
             ) {
                 Icon(Icons.Default.Add, contentDescription = "Registrar visitante")
             }
@@ -122,26 +129,13 @@ fun VisitantesScreen(
                 )
             }
 
-            uiState.mensagemFeedback?.let { msg ->
-                item {
-                    Text(
-                        text = msg,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                }
+            item {
+                FeedbackAnimado(mensagem = uiState.mensagemFeedback)
             }
 
-            uiState.erroGeral?.let { erro ->
-                if (!mostrarDialogo) {
-                    item {
-                        Text(
-                            text = erro,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.error
-                        )
-                    }
-                }
+            item {
+                val erroVisivel = if (!mostrarDialogo) uiState.erroGeral else null
+                FeedbackAnimado(mensagem = erroVisivel, ehErro = true)
             }
 
             item {
@@ -232,10 +226,11 @@ private fun VisitanteAtivoCard(
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 PlacaMercosulChip(placa = visitante.placa)
+                Spacer(modifier = Modifier.weight(1f))
                 StatusBadge(
                     texto = visitante.tipoVaga.label,
                     tone = when {
@@ -283,10 +278,17 @@ private fun VisitanteAtivoCard(
                 Text(
                     text = "Entrada às ${Formatadores.formatarHora(visitante.dataHoraEntradaMillis)} (${visitante.turno.label})",
                     style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(1f)
                 )
-                OutlinedButton(onClick = onRegistrarSaida) {
-                    Text("Dar baixa na saída")
+                Spacer(modifier = Modifier.width(8.dp))
+                val baixaInteraction = remember { MutableInteractionSource() }
+                OutlinedButton(
+                    onClick = onRegistrarSaida,
+                    interactionSource = baixaInteraction,
+                    modifier = Modifier.escalaAoPressionar(baixaInteraction)
+                ) {
+                    Text("Dar baixa na saída", maxLines = 1, softWrap = false)
                 }
             }
         }
@@ -306,7 +308,7 @@ private fun VisitanteHistoricoItem(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 14.dp, vertical = 10.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -479,17 +481,14 @@ private fun NovoVisitanteDialog(
                     modifier = Modifier.fillMaxWidth()
                 )
 
-                erroGeral?.let {
-                    Text(
-                        text = it,
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                }
+                FeedbackAnimado(mensagem = erroGeral, ehErro = true)
             }
         },
         confirmButton = {
+            val registrarInteraction = remember { MutableInteractionSource() }
             Button(
+                interactionSource = registrarInteraction,
+                modifier = Modifier.escalaAoPressionar(registrarInteraction),
                 onClick = {
                     onConfirmar(
                         VisitanteRequest(

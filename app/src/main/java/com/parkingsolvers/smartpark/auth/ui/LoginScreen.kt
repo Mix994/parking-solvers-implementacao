@@ -1,9 +1,9 @@
 package com.parkingsolvers.smartpark.auth.ui
 
 import androidx.compose.animation.animateContentSize
-import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -49,7 +49,10 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import com.parkingsolvers.smartpark.BuildConfig
 import com.parkingsolvers.smartpark.R
+import com.parkingsolvers.smartpark.ui.components.FeedbackAnimado
 import com.parkingsolvers.smartpark.ui.components.SmartParkCard
+import com.parkingsolvers.smartpark.ui.components.SmartParkMotion
+import com.parkingsolvers.smartpark.ui.components.escalaAoPressionar
 
 @Composable
 fun LoginScreen(
@@ -109,7 +112,7 @@ fun LoginScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .animateContentSize(tween(240, easing = FastOutSlowInEasing))
+                        .animateContentSize(SmartParkMotion.SpringTamanho)
                         .padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
@@ -158,26 +161,17 @@ fun LoginScreen(
                         modifier = Modifier.fillMaxWidth()
                     )
 
-                    uiState.erroGeral?.let { erro ->
-                        Text(
-                            text = erro,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.error
-                        )
-                    }
+                    FeedbackAnimado(mensagem = uiState.erroGeral, ehErro = true)
+                    FeedbackAnimado(mensagem = uiState.mensagemFeedback, ehErro = false)
 
-                    uiState.mensagemFeedback?.let { msg ->
-                        Text(
-                            text = msg,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                    }
-
+                    val entrarInteraction = remember { MutableInteractionSource() }
                     Button(
                         onClick = viewModel::entrar,
                         enabled = !uiState.carregando,
-                        modifier = Modifier.fillMaxWidth()
+                        interactionSource = entrarInteraction,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .escalaAoPressionar(entrarInteraction)
                     ) {
                         Text(if (uiState.carregando) "Autenticando..." else "Entrar")
                     }

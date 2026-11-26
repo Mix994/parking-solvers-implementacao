@@ -1,5 +1,6 @@
 package com.parkingsolvers.smartpark.servidor.ui
 
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -8,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -39,9 +41,11 @@ import com.parkingsolvers.smartpark.servidor.dto.request.ServidorRequest
 import com.parkingsolvers.smartpark.servidor.dto.response.ServidorResponse
 import com.parkingsolvers.smartpark.ui.components.BadgeTone
 import com.parkingsolvers.smartpark.ui.components.EmptyState
+import com.parkingsolvers.smartpark.ui.components.FeedbackAnimado
 import com.parkingsolvers.smartpark.ui.components.PageHeader
 import com.parkingsolvers.smartpark.ui.components.SmartParkCard
 import com.parkingsolvers.smartpark.ui.components.StatusBadge
+import com.parkingsolvers.smartpark.ui.components.escalaAoPressionar
 
 @Composable
 fun ServidoresScreen(
@@ -55,13 +59,16 @@ fun ServidoresScreen(
 
     Scaffold(
         floatingActionButton = {
+            val fabInteraction = remember { MutableInteractionSource() }
             FloatingActionButton(
                 onClick = {
                     viewModel.limparErrosFormulario()
                     mostrarDialogoNovo = true
                 },
+                interactionSource = fabInteraction,
                 containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary
+                contentColor = MaterialTheme.colorScheme.onPrimary,
+                modifier = Modifier.escalaAoPressionar(fabInteraction, 0.93f)
             ) {
                 Icon(Icons.Default.Add, contentDescription = "Cadastrar servidor")
             }
@@ -86,10 +93,8 @@ fun ServidoresScreen(
                 item { Spacer(modifier = Modifier.height(8.dp)) }
             }
 
-            uiState.mensagemFeedback?.let { msg ->
-                item {
-                    Text(text = msg, color = MaterialTheme.colorScheme.primary)
-                }
+            item {
+                FeedbackAnimado(mensagem = uiState.mensagemFeedback)
             }
 
             if (servidores.isEmpty()) {
@@ -170,6 +175,7 @@ private fun ServidorCard(
                     fontWeight = FontWeight.SemiBold,
                     modifier = Modifier.weight(1f)
                 )
+                Spacer(modifier = Modifier.width(8.dp))
                 StatusBadge(
                     texto = if (servidor.ativo) "Ativo" else "Inativo",
                     tone = if (servidor.ativo) BadgeTone.SUCESSO else BadgeTone.NEUTRO
@@ -270,17 +276,14 @@ private fun ServidorFormDialog(
                     modifier = Modifier.fillMaxWidth()
                 )
 
-                erroGeral?.let {
-                    Text(
-                        text = it,
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                }
+                FeedbackAnimado(mensagem = erroGeral, ehErro = true)
             }
         },
         confirmButton = {
+            val salvarInteraction = remember { MutableInteractionSource() }
             Button(
+                interactionSource = salvarInteraction,
+                modifier = Modifier.escalaAoPressionar(salvarInteraction),
                 onClick = {
                     onConfirmar(
                         ServidorRequest(

@@ -1,6 +1,10 @@
 package com.parkingsolvers.smartpark.veiculo.ui
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -17,8 +21,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Accessible
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
-import androidx.compose.material.icons.filled.Accessible
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.EvStation
@@ -59,10 +63,13 @@ import com.parkingsolvers.smartpark.movimentacao.model.TipoVaga
 import com.parkingsolvers.smartpark.servidor.dto.response.ServidorResponse
 import com.parkingsolvers.smartpark.ui.components.BadgeTone
 import com.parkingsolvers.smartpark.ui.components.EmptyState
+import com.parkingsolvers.smartpark.ui.components.FeedbackAnimado
 import com.parkingsolvers.smartpark.ui.components.PageHeader
 import com.parkingsolvers.smartpark.ui.components.PlacaMercosulChip
 import com.parkingsolvers.smartpark.ui.components.SmartParkCard
+import com.parkingsolvers.smartpark.ui.components.SmartParkMotion
 import com.parkingsolvers.smartpark.ui.components.StatusBadge
+import com.parkingsolvers.smartpark.ui.components.escalaAoPressionar
 import com.parkingsolvers.smartpark.veiculo.dto.request.VeiculoRequest
 import com.parkingsolvers.smartpark.veiculo.dto.response.VeiculoResponse
 import com.parkingsolvers.smartpark.veiculo.model.TipoCadastroVeiculo
@@ -82,13 +89,16 @@ fun VeiculosScreen(
 
     Scaffold(
         floatingActionButton = {
+            val fabInteraction = remember { MutableInteractionSource() }
             FloatingActionButton(
                 onClick = {
                     viewModel.limparErrosFormulario()
                     mostrarDialogo = true
                 },
+                interactionSource = fabInteraction,
                 containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary
+                contentColor = MaterialTheme.colorScheme.onPrimary,
+                modifier = Modifier.escalaAoPressionar(fabInteraction, 0.93f)
             ) {
                 Icon(Icons.Default.Add, contentDescription = "Cadastrar veículo")
             }
@@ -113,18 +123,13 @@ fun VeiculosScreen(
                 )
             }
 
-            uiState.mensagemFeedback?.let { msg ->
-                item {
-                    Text(text = msg, color = MaterialTheme.colorScheme.primary)
-                }
+            item {
+                FeedbackAnimado(mensagem = uiState.mensagemFeedback)
             }
 
-            if (!mostrarDialogo && veiculoParaSimular == null) {
-                uiState.erroGeral?.let { erro ->
-                    item {
-                        Text(text = erro, color = MaterialTheme.colorScheme.error)
-                    }
-                }
+            item {
+                val erroVisivel = if (!mostrarDialogo && veiculoParaSimular == null) uiState.erroGeral else null
+                FeedbackAnimado(mensagem = erroVisivel, ehErro = true)
             }
 
             if (veiculos.isEmpty()) {
@@ -211,10 +216,11 @@ private fun VeiculoCard(
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 PlacaMercosulChip(placa = veiculo.placa)
+                Spacer(modifier = Modifier.weight(1f))
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     StatusBadge(
                         texto = veiculo.tipoCadastro.label,
@@ -290,18 +296,29 @@ private fun VeiculoCard(
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                TextButton(onClick = onAlternarAtivo) {
-                    Text(if (veiculo.ativo) "Inativar veículo" else "Reativar veículo")
+                TextButton(
+                    onClick = onAlternarAtivo,
+                    modifier = Modifier.weight(1f, fill = false)
+                ) {
+                    Text(
+                        text = if (veiculo.ativo) "Inativar veículo" else "Reativar veículo",
+                        maxLines = 1,
+                        softWrap = false
+                    )
                 }
+                Spacer(modifier = Modifier.weight(1f))
 
                 if (permitirSimulacao) {
+                    val simInteraction = remember { MutableInteractionSource() }
                     if (movimentacaoAberta != null) {
                         OutlinedButton(
                             onClick = { onSimularSaida(movimentacaoAberta.id) },
-                            enabled = !processandoSimulacao
+                            enabled = !processandoSimulacao,
+                            interactionSource = simInteraction,
+                            modifier = Modifier.escalaAoPressionar(simInteraction)
                         ) {
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.ExitToApp,
@@ -309,12 +326,14 @@ private fun VeiculoCard(
                                 modifier = Modifier.size(18.dp)
                             )
                             Spacer(modifier = Modifier.width(6.dp))
-                            Text("Sair da vaga")
+                            Text("Sair da vaga", maxLines = 1, softWrap = false)
                         }
                     } else {
                         FilledTonalButton(
                             onClick = onAbrirSimulacao,
-                            enabled = veiculo.ativo && veiculo.validoNoMomento && !processandoSimulacao
+                            enabled = veiculo.ativo && veiculo.validoNoMomento && !processandoSimulacao,
+                            interactionSource = simInteraction,
+                            modifier = Modifier.escalaAoPressionar(simInteraction)
                         ) {
                             Icon(
                                 imageVector = Icons.Default.LocalParking,
@@ -322,7 +341,7 @@ private fun VeiculoCard(
                                 modifier = Modifier.size(18.dp)
                             )
                             Spacer(modifier = Modifier.width(6.dp))
-                            Text("Simular vaga")
+                            Text("Simular vaga", maxLines = 1, softWrap = false)
                         }
                     }
                 }
@@ -363,11 +382,12 @@ private fun SimularEstacionamentoDialog(
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 Row(
+                    modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     PlacaMercosulChip(placa = veiculo.placa)
-                    Column {
+                    Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = "${veiculo.modelo} (${veiculo.cor})",
                             style = MaterialTheme.typography.titleSmall
@@ -387,23 +407,37 @@ private fun SimularEstacionamentoDialog(
 
                 opcoesDisponibilidade.forEach { (tipo, disponibilidade, lotado) ->
                     val selecionado = tipoSelecionado == tipo
-                    Surface(
-                        onClick = { if (!lotado) tipoSelecionado = tipo },
-                        enabled = !lotado && !processando,
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(10.dp),
-                        color = if (selecionado) {
+                    val itemInteraction = remember { MutableInteractionSource() }
+                    val corFundo by animateColorAsState(
+                        targetValue = if (selecionado) {
                             MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f)
                         } else {
                             MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
                         },
+                        animationSpec = tween(220, easing = SmartParkMotion.CurvaPadrao),
+                        label = "fundo_${tipo.name}"
+                    )
+                    val corBorda by animateColorAsState(
+                        targetValue = if (selecionado) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            MaterialTheme.colorScheme.outlineVariant
+                        },
+                        animationSpec = tween(220, easing = SmartParkMotion.CurvaPadrao),
+                        label = "borda_${tipo.name}"
+                    )
+                    Surface(
+                        onClick = { if (!lotado) tipoSelecionado = tipo },
+                        enabled = !lotado && !processando,
+                        interactionSource = itemInteraction,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .escalaAoPressionar(itemInteraction, 0.98f),
+                        shape = RoundedCornerShape(10.dp),
+                        color = corFundo,
                         border = BorderStroke(
                             width = if (selecionado) 1.5.dp else 1.dp,
-                            color = if (selecionado) {
-                                MaterialTheme.colorScheme.primary
-                            } else {
-                                MaterialTheme.colorScheme.outlineVariant
-                            }
+                            color = corBorda
                         )
                     ) {
                         Row(
@@ -451,19 +485,16 @@ private fun SimularEstacionamentoDialog(
                     }
                 }
 
-                erroGeral?.let {
-                    Text(
-                        text = it,
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                }
+                FeedbackAnimado(mensagem = erroGeral, ehErro = true)
             }
         },
         confirmButton = {
+            val confirmarInteraction = remember { MutableInteractionSource() }
             Button(
                 onClick = { onConfirmar(tipoSelecionado) },
-                enabled = !processando && opcoesDisponibilidade.any { it.first == tipoSelecionado && !it.third }
+                enabled = !processando && opcoesDisponibilidade.any { it.first == tipoSelecionado && !it.third },
+                interactionSource = confirmarInteraction,
+                modifier = Modifier.escalaAoPressionar(confirmarInteraction)
             ) {
                 Text(if (processando) "Registrando..." else "Confirmar entrada")
             }
@@ -507,7 +538,7 @@ private fun disponibilidadeParaTipo(
 private fun iconePorTipoVaga(tipo: TipoVaga): ImageVector = when (tipo) {
     TipoVaga.COMUM -> Icons.Default.DirectionsCar
     TipoVaga.CARREGAMENTO_ELETRICO -> Icons.Default.EvStation
-    TipoVaga.EXCLUSIVA_PCD, TipoVaga.EXCLUSIVA_IDOSO -> Icons.Default.Accessible
+    TipoVaga.EXCLUSIVA_PCD, TipoVaga.EXCLUSIVA_IDOSO -> Icons.AutoMirrored.Filled.Accessible
     TipoVaga.EXCLUSIVA_OFICIAL -> Icons.Default.VerifiedUser
 }
 
@@ -579,39 +610,44 @@ private fun NovoVeiculoDialog(
                 )
 
                 Text("Tipo de cadastro:", style = MaterialTheme.typography.labelMedium)
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
                     TipoCadastroVeiculo.entries.forEach { tipo ->
                         FilterChip(
                             selected = tipoCadastro == tipo,
                             onClick = { tipoCadastro = tipo },
-                            label = { Text(tipo.label) }
+                            label = { Text(tipo.label, maxLines = 1, softWrap = false) }
                         )
                     }
                 }
 
                 if (tipoCadastro == TipoCadastroVeiculo.TEMPORARIO) {
                     Text("Validade temporária a partir de hoje:", style = MaterialTheme.typography.labelMedium)
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
                         listOf(1, 3, 7, 15).forEach { dias ->
                             FilterChip(
                                 selected = diasValidade == dias,
                                 onClick = { diasValidade = dias },
-                                label = { Text("${dias}d") }
+                                label = { Text("${dias}d", maxLines = 1, softWrap = false) }
                             )
                         }
                     }
                 }
 
-                erroGeral?.let {
-                    Text(
-                        text = it,
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                }
+                FeedbackAnimado(mensagem = erroGeral, ehErro = true)
             }
         },
         confirmButton = {
+            val salvarInteraction = remember { MutableInteractionSource() }
             Button(
                 onClick = {
                     val agora = System.currentTimeMillis()
@@ -628,7 +664,9 @@ private fun NovoVeiculoDialog(
                         )
                     )
                 },
-                enabled = servidorSelecionadoId > 0L
+                enabled = servidorSelecionadoId > 0L,
+                interactionSource = salvarInteraction,
+                modifier = Modifier.escalaAoPressionar(salvarInteraction)
             ) {
                 Text("Salvar veículo")
             }

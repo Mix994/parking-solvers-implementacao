@@ -1,13 +1,9 @@
 package com.parkingsolvers.smartpark.dashboard.ui
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -52,12 +48,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.parkingsolvers.smartpark.dashboard.model.PeriodoDashboard
 import com.parkingsolvers.smartpark.ui.components.BadgeTone
+import com.parkingsolvers.smartpark.ui.components.FeedbackAnimado
 import com.parkingsolvers.smartpark.ui.components.PageHeader
 import com.parkingsolvers.smartpark.ui.components.SmartParkCard
+import com.parkingsolvers.smartpark.ui.components.SmartParkMotion
 import com.parkingsolvers.smartpark.ui.components.StatusBadge
+import com.parkingsolvers.smartpark.ui.components.escalaAoPressionar
 
 @Composable
 fun DashboardScreen(
@@ -89,21 +89,36 @@ fun DashboardScreen(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(
+                    modifier = Modifier
+                        .weight(1f)
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
                     PeriodoDashboard.entries.forEach { opcao ->
                         FilterChip(
                             selected = periodo == opcao,
                             onClick = { viewModel.selecionarPeriodo(opcao) },
-                            label = { Text(opcao.label) }
+                            label = {
+                                Text(
+                                    text = opcao.label,
+                                    maxLines = 1,
+                                    softWrap = false
+                                )
+                            }
                         )
                     }
                 }
                 if (podeConfigurarVagas && dados != null) {
+                    Spacer(modifier = Modifier.width(8.dp))
+                    val vagasInteraction = remember { MutableInteractionSource() }
                     TextButton(
                         onClick = {
                             viewModel.limparErrosConfiguracao()
                             mostrarDialogoCapacidade = true
-                        }
+                        },
+                        interactionSource = vagasInteraction,
+                        modifier = Modifier.escalaAoPressionar(vagasInteraction)
                     ) {
                         Icon(
                             imageVector = Icons.Default.Tune,
@@ -111,20 +126,18 @@ fun DashboardScreen(
                             modifier = Modifier.size(18.dp)
                         )
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text("Vagas")
+                        Text(
+                            text = "Vagas",
+                            maxLines = 1,
+                            softWrap = false
+                        )
                     }
                 }
             }
         }
 
-        uiState.mensagemFeedback?.let { msg ->
-            item {
-                Text(
-                    text = msg,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.primary
-                )
-            }
+        item {
+            FeedbackAnimado(mensagem = uiState.mensagemFeedback)
         }
 
         if (dados == null) {
@@ -141,7 +154,7 @@ fun DashboardScreen(
             item {
                 val progressoGeral by animateFloatAsState(
                     targetValue = dashboard.percentualOcupacaoAtual,
-                    animationSpec = tween(450, easing = FastOutSlowInEasing),
+                    animationSpec = tween(500, easing = SmartParkMotion.CurvaPadrao),
                     label = "progresso_geral_admin"
                 )
                 Surface(
@@ -158,7 +171,7 @@ fun DashboardScreen(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.Bottom
                         ) {
-                            Column {
+                            Column(modifier = Modifier.weight(1f)) {
                                 Text(
                                     text = "Veículos no pátio agora (${dashboard.vagasLivresAgora} livres)",
                                     style = MaterialTheme.typography.labelMedium,
@@ -170,10 +183,13 @@ fun DashboardScreen(
                                     color = MaterialTheme.colorScheme.onPrimary
                                 )
                             }
+                            Spacer(modifier = Modifier.width(8.dp))
                             Text(
                                 text = "${(dashboard.percentualOcupacaoAtual * 100).toInt()}%",
                                 style = MaterialTheme.typography.headlineSmall,
-                                color = MaterialTheme.colorScheme.onPrimary
+                                color = MaterialTheme.colorScheme.onPrimary,
+                                maxLines = 1,
+                                softWrap = false
                             )
                         }
 
@@ -200,7 +216,7 @@ fun DashboardScreen(
                     dashboard.vagasEletricasOcupadasAgora >= dashboard.capacidadeCarregamentoEletrico
                 val progressoEletrico by animateFloatAsState(
                     targetValue = dashboard.percentualEletricasAtual,
-                    animationSpec = tween(450, easing = FastOutSlowInEasing),
+                    animationSpec = tween(500, easing = SmartParkMotion.CurvaPadrao),
                     label = "progresso_eletrico_admin"
                 )
                 SmartParkCard(
@@ -216,7 +232,10 @@ fun DashboardScreen(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
+                            Row(
+                                modifier = Modifier.weight(1f),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
                                 Icon(
                                     imageVector = Icons.Default.EvStation,
                                     contentDescription = null,
@@ -226,9 +245,12 @@ fun DashboardScreen(
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(
                                     text = "Carregamento de veículos elétricos",
-                                    style = MaterialTheme.typography.titleSmall
+                                    style = MaterialTheme.typography.titleSmall,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis
                                 )
                             }
+                            Spacer(modifier = Modifier.width(8.dp))
                             StatusBadge(
                                 texto = if (lotadoEletrico) "Lotado" else "${dashboard.vagasEletricasLivresAgora} livre(s)",
                                 tone = if (lotadoEletrico) BadgeTone.ALERTA else BadgeTone.SUCESSO
@@ -243,12 +265,16 @@ fun DashboardScreen(
                             Text(
                                 text = "${dashboard.vagasEletricasOcupadasAgora} de ${dashboard.capacidadeCarregamentoEletrico} vagas em uso",
                                 style = MaterialTheme.typography.titleMedium,
-                                color = MaterialTheme.colorScheme.primary
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.weight(1f)
                             )
+                            Spacer(modifier = Modifier.width(8.dp))
                             Text(
                                 text = "${(dashboard.percentualEletricasAtual * 100).toInt()}%",
                                 style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                softWrap = false
                             )
                         }
 
@@ -269,13 +295,17 @@ fun DashboardScreen(
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     modifier = Modifier.weight(1f)
                                 )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                val expandirInteraction = remember { MutableInteractionSource() }
                                 OutlinedButton(
                                     onClick = {
                                         viewModel.limparErrosConfiguracao()
                                         mostrarDialogoCapacidade = true
-                                    }
+                                    },
+                                    interactionSource = expandirInteraction,
+                                    modifier = Modifier.escalaAoPressionar(expandirInteraction)
                                 ) {
-                                    Text("Expandir")
+                                    Text("Expandir", maxLines = 1, softWrap = false)
                                 }
                             }
                         }
@@ -342,7 +372,7 @@ fun DashboardScreen(
                         dashboard.ocupacaoPorTurno.forEach { item ->
                             val progressoTurno by animateFloatAsState(
                                 targetValue = item.percentualLotacao,
-                                animationSpec = tween(420, easing = FastOutSlowInEasing),
+                                animationSpec = tween(500, easing = SmartParkMotion.CurvaPadrao),
                                 label = "turno_${item.turno.name}"
                             )
                             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -354,12 +384,16 @@ fun DashboardScreen(
                                     Text(
                                         text = "${item.turno.label} (${item.turno.faixaHorario})",
                                         style = MaterialTheme.typography.bodyMedium,
-                                        fontWeight = FontWeight.Medium
+                                        fontWeight = FontWeight.Medium,
+                                        modifier = Modifier.weight(1f)
                                     )
+                                    Spacer(modifier = Modifier.width(8.dp))
                                     Text(
                                         text = "${item.totalEntradas} entradas (${(item.percentualLotacao * 100).toInt()}%)",
                                         style = MaterialTheme.typography.labelMedium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        maxLines = 1,
+                                        softWrap = false
                                     )
                                 }
                                 LinearProgressIndicator(
@@ -391,7 +425,12 @@ fun DashboardScreen(
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text(text = vaga.tipoVaga.label, style = MaterialTheme.typography.bodyMedium)
+                                Text(
+                                    text = vaga.tipoVaga.label,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
                                 Text(
                                     text = "${vaga.ocupadasAgora} ocupadas agora (${vaga.totalRegistros} no período)",
                                     style = MaterialTheme.typography.labelMedium,
@@ -475,8 +514,12 @@ private fun ConfigurarVagasDialog(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
+                        val menosInteraction = remember { MutableInteractionSource() }
+                        val maisInteraction = remember { MutableInteractionSource() }
                         FilledTonalIconButton(
-                            onClick = { if (eletricas > 0) eletricas-- }
+                            onClick = { if (eletricas > 0) eletricas-- },
+                            interactionSource = menosInteraction,
+                            modifier = Modifier.escalaAoPressionar(menosInteraction, 0.92f)
                         ) {
                             Icon(Icons.Default.Remove, contentDescription = "Diminuir vaga elétrica")
                         }
@@ -486,7 +529,9 @@ private fun ConfigurarVagasDialog(
                             fontWeight = FontWeight.Bold
                         )
                         FilledTonalIconButton(
-                            onClick = { eletricas++ }
+                            onClick = { eletricas++ },
+                            interactionSource = maisInteraction,
+                            modifier = Modifier.escalaAoPressionar(maisInteraction, 0.92f)
                         ) {
                             Icon(Icons.Default.Add, contentDescription = "Expandir vaga elétrica")
                         }
@@ -524,6 +569,7 @@ private fun ConfigurarVagasDialog(
             }
         },
         confirmButton = {
+            val salvarInteraction = remember { MutableInteractionSource() }
             Button(
                 onClick = {
                     onSalvar(
@@ -531,7 +577,9 @@ private fun ConfigurarVagasDialog(
                         exclusivasTexto.toIntOrNull() ?: -1,
                         eletricas
                     )
-                }
+                },
+                interactionSource = salvarInteraction,
+                modifier = Modifier.escalaAoPressionar(salvarInteraction)
             ) {
                 Text("Salvar capacidades")
             }

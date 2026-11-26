@@ -1,7 +1,6 @@
 package com.parkingsolvers.smartpark.dashboard.ui
 
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -22,7 +21,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Accessible
+import androidx.compose.material.icons.automirrored.filled.Accessible
 import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.EvStation
 import androidx.compose.material3.FilterChip
@@ -48,6 +47,7 @@ import com.parkingsolvers.smartpark.movimentacao.model.TipoVaga
 import com.parkingsolvers.smartpark.ui.components.BadgeTone
 import com.parkingsolvers.smartpark.ui.components.PageHeader
 import com.parkingsolvers.smartpark.ui.components.SmartParkCard
+import com.parkingsolvers.smartpark.ui.components.SmartParkMotion
 import com.parkingsolvers.smartpark.ui.components.StatusBadge
 
 enum class FiltroCategoriaVaga(val label: String) {
@@ -117,8 +117,8 @@ fun VagasDisponiveisScreen(
                 AnimatedContent(
                     targetState = filtro,
                     transitionSpec = {
-                        fadeIn(tween(220, easing = FastOutSlowInEasing)) togetherWith
-                            fadeOut(tween(150, easing = FastOutSlowInEasing))
+                        fadeIn(tween(260, easing = SmartParkMotion.CurvaPadrao)) togetherWith
+                            fadeOut(tween(180, easing = SmartParkMotion.CurvaPadrao))
                     },
                     label = "filtro_vagas_docente"
                 ) { categoriaAtual ->
@@ -140,7 +140,7 @@ fun VagasDisponiveisScreen(
                             CategoriaVagaCard(
                                 titulo = "Vagas PCD e exclusivas",
                                 subtitulo = "PCD, Idoso e Viaturas Oficiais",
-                                icone = Icons.Default.Accessible,
+                                icone = Icons.AutoMirrored.Filled.Accessible,
                                 livres = dashboard.vagasExclusivasLivresAgora,
                                 ocupadas = dashboard.vagasExclusivasOcupadasAgora,
                                 capacidade = dashboard.capacidadeExclusivas,
@@ -179,7 +179,7 @@ fun VagasDisponiveisScreen(
 private fun ResumoPatioDocenteBanner(dashboard: DashboardOcupacaoResponse) {
     val progressoAnimado by animateFloatAsState(
         targetValue = dashboard.percentualOcupacaoAtual,
-        animationSpec = tween(durationMillis = 450, easing = FastOutSlowInEasing),
+        animationSpec = tween(durationMillis = 500, easing = SmartParkMotion.CurvaPadrao),
         label = "progresso_geral_docente"
     )
 
@@ -197,7 +197,7 @@ private fun ResumoPatioDocenteBanner(dashboard: DashboardOcupacaoResponse) {
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.Bottom
             ) {
-                Column {
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = "Disponibilidade geral agora",
                         style = MaterialTheme.typography.labelMedium,
@@ -209,10 +209,13 @@ private fun ResumoPatioDocenteBanner(dashboard: DashboardOcupacaoResponse) {
                         color = MaterialTheme.colorScheme.onPrimary
                     )
                 }
+                Spacer(modifier = Modifier.width(8.dp))
                 Text(
                     text = "${dashboard.veiculosNoCampusAgora}/${dashboard.capacidadeTotal}",
                     style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onPrimary
+                    color = MaterialTheme.colorScheme.onPrimary,
+                    maxLines = 1,
+                    softWrap = false
                 )
             }
 
@@ -248,7 +251,7 @@ private fun CategoriaVagaCard(
     val lotado = capacidade > 0 && livres == 0
     val progressoAnimado by animateFloatAsState(
         targetValue = percentualOcupado,
-        animationSpec = tween(durationMillis = 450, easing = FastOutSlowInEasing),
+        animationSpec = tween(durationMillis = 500, easing = SmartParkMotion.CurvaPadrao),
         label = "progresso_$titulo"
     )
 
@@ -321,9 +324,15 @@ private fun CategoriaVagaCard(
                     detalhes.forEach { (nome, info) ->
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(text = nome, style = MaterialTheme.typography.bodyMedium)
+                            Text(
+                                text = nome,
+                                style = MaterialTheme.typography.bodyMedium,
+                                modifier = Modifier.weight(1f)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
                             Text(
                                 text = info,
                                 style = MaterialTheme.typography.labelMedium,

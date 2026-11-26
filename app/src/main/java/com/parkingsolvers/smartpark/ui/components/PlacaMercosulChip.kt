@@ -4,8 +4,10 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Surface
@@ -46,7 +48,10 @@ fun PlacaMercosulChip(
         color = Color.White,
         border = BorderStroke(if (destaque) 1.5.dp else 1.dp, ArdosiaAsfalto)
     ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Column(
+            modifier = Modifier.width(IntrinsicSize.Max),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -59,7 +64,9 @@ fun PlacaMercosulChip(
                     color = Color.White,
                     fontSize = if (destaque) 9.sp else 7.sp,
                     fontWeight = FontWeight.Bold,
-                    letterSpacing = 1.4.sp
+                    letterSpacing = 1.4.sp,
+                    maxLines = 1,
+                    softWrap = false
                 )
             }
             Text(
@@ -69,6 +76,8 @@ fun PlacaMercosulChip(
                 fontWeight = FontWeight.ExtraBold,
                 fontSize = if (destaque) 22.sp else 15.sp,
                 letterSpacing = if (destaque) 2.sp else 1.2.sp,
+                maxLines = 1,
+                softWrap = false,
                 modifier = Modifier.padding(
                     horizontal = if (destaque) 12.dp else 8.dp,
                     vertical = if (destaque) 6.dp else 3.dp

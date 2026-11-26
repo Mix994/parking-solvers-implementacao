@@ -1,5 +1,6 @@
 package com.parkingsolvers.smartpark.ui.components
 
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -121,8 +122,11 @@ fun MeusDadosDialog(
             }
         },
         confirmButton = {
+            val salvarInteraction = remember { MutableInteractionSource() }
             Button(
                 enabled = !salvando,
+                interactionSource = salvarInteraction,
+                modifier = Modifier.escalaAoPressionar(salvarInteraction),
                 onClick = {
                     scope.launch {
                         salvando = true

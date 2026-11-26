@@ -1,13 +1,14 @@
 package com.parkingsolvers.smartpark.ui.components
 
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -36,6 +37,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -70,9 +75,16 @@ fun AppShell(
     val abas = AbaNavegacao.paraPerfil(sessao.perfil)
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val rotaAtual = navBackStackEntry?.destination?.route
+    val haptic = LocalHapticFeedback.current
 
     var mostrarMeusDados by remember { mutableStateOf(false) }
     var placaVisitantePendente by remember { mutableStateOf<String?>(null) }
+    var girosAtualizar by remember { mutableIntStateOf(0) }
+    val rotacaoAtualizar by animateFloatAsState(
+        targetValue = girosAtualizar * 360f,
+        animationSpec = tween(500, easing = SmartParkMotion.CurvaPadrao),
+        label = "rotacao_atualizar"
+    )
 
     Scaffold(
         topBar = {
@@ -85,29 +97,52 @@ fun AppShell(
                         Column {
                             Text(
                                 text = "SmartPark",
-                                style = MaterialTheme.typography.titleMedium
+                                style = MaterialTheme.typography.titleMedium,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
                             Text(
                                 text = "${sessao.perfil.label} — ${sessao.nome}",
                                 style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
                         }
                     },
                     actions = {
-                        IconButton(onClick = { container.sincronizador.notificarMudanca() }) {
+                        val refreshInteraction = remember { MutableInteractionSource() }
+                        val perfilInteraction = remember { MutableInteractionSource() }
+                        val sairInteraction = remember { MutableInteractionSource() }
+                        IconButton(
+                            onClick = {
+                                girosAtualizar++
+                                container.sincronizador.notificarMudanca()
+                            },
+                            interactionSource = refreshInteraction,
+                            modifier = Modifier.escalaAoPressionar(refreshInteraction, 0.9f)
+                        ) {
                             Icon(
                                 imageVector = Icons.Default.Refresh,
-                                contentDescription = "Atualizar dados"
+                                contentDescription = "Atualizar dados",
+                                modifier = Modifier.graphicsLayer { rotationZ = rotacaoAtualizar }
                             )
                         }
-                        IconButton(onClick = { mostrarMeusDados = true }) {
+                        IconButton(
+                            onClick = { mostrarMeusDados = true },
+                            interactionSource = perfilInteraction,
+                            modifier = Modifier.escalaAoPressionar(perfilInteraction, 0.9f)
+                        ) {
                             Icon(
                                 imageVector = Icons.Default.AccountCircle,
                                 contentDescription = "Meus dados"
                             )
                         }
-                        IconButton(onClick = onSair) {
+                        IconButton(
+                            onClick = onSair,
+                            interactionSource = sairInteraction,
+                            modifier = Modifier.escalaAoPressionar(sairInteraction, 0.9f)
+                        ) {
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.Logout,
                                 contentDescription = "Sair"
@@ -122,10 +157,18 @@ fun AppShell(
             if (abas.size > 1) {
                 NavigationBar(containerColor = MaterialTheme.colorScheme.surface) {
                     abas.forEach { aba ->
+                        val selecionada = rotaAtual == aba.rota
+                        val escalaIcone by animateFloatAsState(
+                            targetValue = if (selecionada) 1.12f else 1f,
+                            animationSpec = SmartParkMotion.SpringToque,
+                            label = "escala_aba_${aba.rota}"
+                        )
+                        val tabInteraction = remember { MutableInteractionSource() }
                         NavigationBarItem(
-                            selected = rotaAtual == aba.rota,
+                            selected = selecionada,
                             onClick = {
-                                if (rotaAtual != aba.rota) {
+                                if (!selecionada) {
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                     navController.navigate(aba.rota) {
                                         popUpTo(navController.graph.startDestinationId) {
                                             saveState = true
@@ -135,8 +178,26 @@ fun AppShell(
                                     }
                                 }
                             },
-                            icon = { Icon(aba.icone, contentDescription = aba.label) },
-                            label = { Text(aba.label) }
+                            interactionSource = tabInteraction,
+                            icon = {
+                                Icon(
+                                    imageVector = aba.icone,
+                                    contentDescription = aba.label,
+                                    modifier = Modifier.graphicsLayer {
+                                        scaleX = escalaIcone
+                                        scaleY = escalaIcone
+                                    }
+                                )
+                            },
+                            label = {
+                                Text(
+                                    text = aba.label,
+                                    maxLines = 1,
+                                    softWrap = false,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            },
+                            modifier = Modifier.escalaAoPressionar(tabInteraction, 0.95f)
                         )
                     }
                 }
@@ -152,18 +213,26 @@ fun AppShell(
                 navController = navController,
                 startDestination = AbaNavegacao.rotaInicial(sessao.perfil),
                 enterTransition = {
-                    fadeIn(tween(240, easing = FastOutSlowInEasing)) +
-                        slideInHorizontally(tween(240, easing = FastOutSlowInEasing)) { it / 18 }
+                    val origem = abas.indexOfFirst { it.rota == initialState.destination.route }
+                    val destino = abas.indexOfFirst { it.rota == targetState.destination.route }
+                    val direcao = if (origem >= 0 && destino >= 0 && destino < origem) -1 else 1
+                    fadeIn(tween(300, easing = SmartParkMotion.CurvaPadrao)) +
+                        slideInHorizontally(tween(300, easing = SmartParkMotion.CurvaPadrao)) { direcao * (it / 10) }
                 },
                 exitTransition = {
-                    fadeOut(tween(180, easing = FastOutSlowInEasing))
+                    val origem = abas.indexOfFirst { it.rota == initialState.destination.route }
+                    val destino = abas.indexOfFirst { it.rota == targetState.destination.route }
+                    val direcao = if (origem >= 0 && destino >= 0 && destino < origem) -1 else 1
+                    fadeOut(tween(220, easing = SmartParkMotion.CurvaPadrao)) +
+                        slideOutHorizontally(tween(220, easing = SmartParkMotion.CurvaPadrao)) { -direcao * (it / 14) }
                 },
                 popEnterTransition = {
-                    fadeIn(tween(240, easing = FastOutSlowInEasing)) +
-                        slideInHorizontally(tween(240, easing = FastOutSlowInEasing)) { -it / 18 }
+                    fadeIn(tween(300, easing = SmartParkMotion.CurvaPadrao)) +
+                        slideInHorizontally(tween(300, easing = SmartParkMotion.CurvaPadrao)) { -it / 10 }
                 },
                 popExitTransition = {
-                    fadeOut(tween(180, easing = FastOutSlowInEasing))
+                    fadeOut(tween(220, easing = SmartParkMotion.CurvaPadrao)) +
+                        slideOutHorizontally(tween(220, easing = SmartParkMotion.CurvaPadrao)) { it / 14 }
                 }
             ) {
                 composable(AbaNavegacao.VAGAS.rota) {
@@ -291,11 +360,11 @@ private fun GestaoAdminScreen(
             modifier = Modifier.weight(1f),
             transitionSpec = {
                 val direcao = if (targetState > initialState) 1 else -1
-                (fadeIn(tween(220, easing = FastOutSlowInEasing)) +
-                    slideInHorizontally(tween(220, easing = FastOutSlowInEasing)) { direcao * (it / 12) })
+                (fadeIn(tween(280, easing = SmartParkMotion.CurvaPadrao)) +
+                    slideInHorizontally(tween(280, easing = SmartParkMotion.CurvaPadrao)) { direcao * (it / 10) })
                     .togetherWith(
-                        fadeOut(tween(160, easing = FastOutSlowInEasing)) +
-                            slideOutHorizontally(tween(160)) { -direcao * (it / 12) }
+                        fadeOut(tween(200, easing = SmartParkMotion.CurvaPadrao)) +
+                            slideOutHorizontally(tween(200, easing = SmartParkMotion.CurvaPadrao)) { -direcao * (it / 14) }
                     )
             },
             label = "gestao_tabs"

@@ -5,11 +5,11 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -17,6 +17,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.parkingsolvers.smartpark.auth.ui.LoginScreen
 import com.parkingsolvers.smartpark.auth.ui.LoginViewModel
 import com.parkingsolvers.smartpark.ui.components.AppShell
+import com.parkingsolvers.smartpark.ui.components.SmartParkMotion
 import com.parkingsolvers.smartpark.ui.theme.ParkingSolversTheme
 
 class MainActivity : ComponentActivity() {
@@ -34,9 +35,12 @@ class MainActivity : ComponentActivity() {
                 AnimatedContent(
                     targetState = sessao,
                     transitionSpec = {
-                        (fadeIn(tween(280, easing = FastOutSlowInEasing)) +
-                            scaleIn(tween(280, easing = FastOutSlowInEasing), initialScale = 0.98f))
-                            .togetherWith(fadeOut(tween(180, easing = FastOutSlowInEasing)))
+                        (fadeIn(tween(340, easing = SmartParkMotion.CurvaPadrao)) +
+                            scaleIn(tween(340, easing = SmartParkMotion.CurvaPadrao), initialScale = 0.96f))
+                            .togetherWith(
+                                fadeOut(tween(200, easing = SmartParkMotion.CurvaPadrao)) +
+                                    scaleOut(tween(200, easing = SmartParkMotion.CurvaPadrao), targetScale = 1.02f)
+                            )
                     },
                     label = "transicao_sessao"
                 ) { usuarioLogado ->
