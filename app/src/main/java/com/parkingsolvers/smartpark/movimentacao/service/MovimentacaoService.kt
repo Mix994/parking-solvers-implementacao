@@ -10,7 +10,8 @@ import kotlinx.coroutines.flow.Flow
 
 class MovimentacaoService(
     private val api: SmartParkApi,
-    private val sincronizador: SincronizadorDados
+    private val sincronizador: SincronizadorDados,
+    private val onAcaoLocal: () -> Unit = {}
 ) {
     fun observarNoEstacionamento(): Flow<List<MovimentacaoResponse>> =
         fluxoRemoto(sincronizador, emptyList()) {
@@ -27,11 +28,21 @@ class MovimentacaoService(
             api.listarMovimentacoes().map { it.paraDominio() }
         }
 
-    suspend fun registrarEntrada(request: EntradaRequest): MovimentacaoResponse =
-        ApiErrorMapper.executar { api.registrarEntradaMovimentacao(request).paraDominio() }
-            .also { sincronizador.notificarMudanca() }
+    suspend fun registrarEntrada(request: EntradaRequest): MovimentacaoResponse {
+        onAcaoLocal()
+        return ApiErrorMapper.executar { api.registrarEntradaMovimentacao(request).paraDominio() }
+            .also {
+                onAcaoLocal()
+                sincronizador.notificarMudanca()
+            }
+    }
 
-    suspend fun registrarSaida(movimentacaoId: Long): MovimentacaoResponse =
-        ApiErrorMapper.executar { api.registrarSaidaMovimentacao(movimentacaoId).paraDominio() }
-            .also { sincronizador.notificarMudanca() }
+    suspend fun registrarSaida(movimentacaoId: Long): MovimentacaoResponse {
+        onAcaoLocal()
+        return ApiErrorMapper.executar { api.registrarSaidaMovimentacao(movimentacaoId).paraDominio() }
+            .also {
+                onAcaoLocal()
+                sincronizador.notificarMudanca()
+            }
+    }
 }

@@ -1,5 +1,6 @@
 package com.parkingsolvers.smartpark
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -16,6 +17,7 @@ import androidx.compose.runtime.getValue
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.parkingsolvers.smartpark.auth.ui.LoginScreen
 import com.parkingsolvers.smartpark.auth.ui.LoginViewModel
+import com.parkingsolvers.smartpark.notificacao.NotificacaoPortariaHelper
 import com.parkingsolvers.smartpark.ui.components.AppShell
 import com.parkingsolvers.smartpark.ui.components.SmartParkMotion
 import com.parkingsolvers.smartpark.ui.theme.ParkingSolversTheme
@@ -27,6 +29,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
 
         val container = (application as SmartParkApplication).container
+        tratarIntentNotificacao(intent, container)
 
         setContent {
             ParkingSolversTheme {
@@ -60,6 +63,20 @@ class MainActivity : ComponentActivity() {
                     }
                 }
             }
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        val container = (application as SmartParkApplication).container
+        tratarIntentNotificacao(intent, container)
+    }
+
+    private fun tratarIntentNotificacao(intent: Intent?, container: AppContainer) {
+        if (intent?.getBooleanExtra(NotificacaoPortariaHelper.EXTRA_ABRIR_PORTARIA, false) == true) {
+            container.solicitarAberturaPortaria()
+            intent.removeExtra(NotificacaoPortariaHelper.EXTRA_ABRIR_PORTARIA)
         }
     }
 }

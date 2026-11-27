@@ -10,7 +10,8 @@ import kotlinx.coroutines.flow.Flow
 
 class VisitanteService(
     private val api: SmartParkApi,
-    private val sincronizador: SincronizadorDados
+    private val sincronizador: SincronizadorDados,
+    private val onAcaoLocal: () -> Unit = {}
 ) {
     fun observarNoCampus(): Flow<List<VisitanteResponse>> =
         fluxoRemoto(sincronizador, emptyList()) {
@@ -25,11 +26,21 @@ class VisitanteService(
     suspend fun registrarEntrada(
         request: VisitanteRequest,
         @Suppress("UNUSED_PARAMETER") registradoPor: String
-    ): VisitanteResponse =
-        ApiErrorMapper.executar { api.registrarEntradaVisitante(request).paraDominio() }
-            .also { sincronizador.notificarMudanca() }
+    ): VisitanteResponse {
+        onAcaoLocal()
+        return ApiErrorMapper.executar { api.registrarEntradaVisitante(request).paraDominio() }
+            .also {
+                onAcaoLocal()
+                sincronizador.notificarMudanca()
+            }
+    }
 
-    suspend fun registrarSaida(visitanteId: Long): VisitanteResponse =
-        ApiErrorMapper.executar { api.registrarSaidaVisitante(visitanteId).paraDominio() }
-            .also { sincronizador.notificarMudanca() }
+    suspend fun registrarSaida(visitanteId: Long): VisitanteResponse {
+        onAcaoLocal()
+        return ApiErrorMapper.executar { api.registrarSaidaVisitante(visitanteId).paraDominio() }
+            .also {
+                onAcaoLocal()
+                sincronizador.notificarMudanca()
+            }
+    }
 }

@@ -1,5 +1,14 @@
 package com.parkingsolvers.smartpark.ui.components
 
+import android.Manifest
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
+import android.content.Intent
+import android.os.Build
+import android.provider.Settings
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -16,6 +25,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.AccountCircle
+import androidx.compose.material.icons.filled.NotificationsActive
+import androidx.compose.material.icons.filled.NotificationsOff
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -31,6 +42,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -39,8 +53,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.core.app.ActivityCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -54,6 +73,7 @@ import com.parkingsolvers.smartpark.dashboard.ui.DashboardViewModel
 import com.parkingsolvers.smartpark.dashboard.ui.VagasDisponiveisScreen
 import com.parkingsolvers.smartpark.movimentacao.ui.PortariaScreen
 import com.parkingsolvers.smartpark.movimentacao.ui.PortariaViewModel
+import com.parkingsolvers.smartpark.notificacao.NotificacaoPortariaHelper
 import com.parkingsolvers.smartpark.servidor.ui.ServidorViewModel
 import com.parkingsolvers.smartpark.servidor.ui.ServidoresScreen
 import com.parkingsolvers.smartpark.ui.navigation.AbaNavegacao
@@ -76,6 +96,95 @@ fun AppShell(
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val rotaAtual = navBackStackEntry?.destination?.route
     val haptic = LocalHapticFeedback.current
+    val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+
+    val ehPortariaOuAdmin = sessao.perfil == PerfilUsuario.PORTARIA || sessao.perfil == PerfilUsuario.ADMIN
+    val alertasForaDoAppAtivos by container.preferenciasMonitoramento.alertasForaDoAppAtivo.collectAsState()
+    val abrirPortariaPendente by container.abrirPortariaPendente.collectAsState()
+
+    var permissaoNotificacaoConcedida by remember {
+        mutableStateOf(NotificacaoPortariaHelper.temPermissaoNotificacao(context))
+    }
+
+    val launcherPermissaoNotificacao = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { concedida ->
+        permissaoNotificacaoConcedida = NotificacaoPortariaHelper.temPermissaoNotificacao(context)
+        if (concedida) {
+            container.preferenciasMonitoramento.definirAlertasAtivos(true)
+        }
+        container.atualizarEstadoTempoReal()
+    }
+
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                val atual = NotificacaoPortariaHelper.temPermissaoNotificacao(context)
+                if (atual != permissaoNotificacaoConcedida) {
+                    permissaoNotificacaoConcedida = atual
+                    container.atualizarEstadoTempoReal()
+                }
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
+    LaunchedEffect(sessao.usuarioId, ehPortariaOuAdmin) {
+        if (ehPortariaOuAdmin &&
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            !permissaoNotificacaoConcedida &&
+            !container.preferenciasMonitoramento.jaSolicitouPermissaoNotificacao()
+        ) {
+            container.preferenciasMonitoramento.marcarPermissaoNotificacaoSolicitada()
+            launcherPermissaoNotificacao.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
+
+    LaunchedEffect(abrirPortariaPendente) {
+        if (abrirPortariaPendente) {
+            if (AbaNavegacao.PORTARIA.perfisPermitidos.contains(sessao.perfil) &&
+                rotaAtual != AbaNavegacao.PORTARIA.rota
+            ) {
+                navController.navigate(AbaNavegacao.PORTARIA.rota) {
+                    popUpTo(navController.graph.startDestinationId) {
+                        saveState = true
+                    }
+                    launchSingleTop = true
+                    restoreState = true
+                }
+            }
+            container.consumirAberturaPortaria()
+        }
+    }
+
+    fun alternarAlertasForaDoApp() {
+        if (!permissaoNotificacaoConcedida) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                val jaSolicitou = container.preferenciasMonitoramento.jaSolicitouPermissaoNotificacao()
+                val activity = context.encontrarActivity()
+                val deveAbrirConfig = jaSolicitou &&
+                    activity != null &&
+                    !ActivityCompat.shouldShowRequestPermissionRationale(
+                        activity,
+                        Manifest.permission.POST_NOTIFICATIONS
+                    )
+                if (deveAbrirConfig) {
+                    abrirConfiguracoesNotificacao(context)
+                } else {
+                    container.preferenciasMonitoramento.marcarPermissaoNotificacaoSolicitada()
+                    launcherPermissaoNotificacao.launch(Manifest.permission.POST_NOTIFICATIONS)
+                }
+            } else {
+                abrirConfiguracoesNotificacao(context)
+            }
+            return
+        }
+
+        container.preferenciasMonitoramento.definirAlertasAtivos(!alertasForaDoAppAtivos)
+        container.atualizarEstadoTempoReal()
+    }
 
     var mostrarMeusDados by remember { mutableStateOf(false) }
     var placaVisitantePendente by remember { mutableStateOf<String?>(null) }
@@ -112,8 +221,35 @@ fun AppShell(
                     },
                     actions = {
                         val refreshInteraction = remember { MutableInteractionSource() }
+                        val alertaInteraction = remember { MutableInteractionSource() }
                         val perfilInteraction = remember { MutableInteractionSource() }
                         val sairInteraction = remember { MutableInteractionSource() }
+                        if (ehPortariaOuAdmin) {
+                            val alertasLigados = alertasForaDoAppAtivos && permissaoNotificacaoConcedida
+                            IconButton(
+                                onClick = { alternarAlertasForaDoApp() },
+                                interactionSource = alertaInteraction,
+                                modifier = Modifier.escalaAoPressionar(alertaInteraction, 0.9f)
+                            ) {
+                                Icon(
+                                    imageVector = if (alertasLigados) {
+                                        Icons.Default.NotificationsActive
+                                    } else {
+                                        Icons.Default.NotificationsOff
+                                    },
+                                    contentDescription = if (alertasLigados) {
+                                        "Alertas fora do aplicativo ativados"
+                                    } else {
+                                        "Alertas fora do aplicativo desativados"
+                                    },
+                                    tint = if (alertasLigados) {
+                                        MaterialTheme.colorScheme.primary
+                                    } else {
+                                        MaterialTheme.colorScheme.onSurfaceVariant
+                                    }
+                                )
+                            }
+                        }
                         IconButton(
                             onClick = {
                                 girosAtualizar++
@@ -262,11 +398,15 @@ fun AppShell(
                     val vm: PortariaViewModel = viewModel(
                         factory = PortariaViewModel.factory(
                             veiculoService = container.veiculoService,
-                            movimentacaoService = container.movimentacaoService
+                            movimentacaoService = container.movimentacaoService,
+                            clienteTempoReal = container.clienteTempoReal
                         )
                     )
                     PortariaScreen(
                         viewModel = vm,
+                        alertasForaDoAppAtivos = alertasForaDoAppAtivos,
+                        permissaoNotificacaoConcedida = permissaoNotificacaoConcedida,
+                        onAlternarAlertasForaDoApp = ::alternarAlertasForaDoApp,
                         onRegistrarComoVisitante = { placa ->
                             placaVisitantePendente = placa
                             navController.navigate(AbaNavegacao.VISITANTES.rota) {
@@ -390,4 +530,25 @@ private fun GestaoAdminScreen(
             }
         }
     }
+}
+
+private tailrec fun Context.encontrarActivity(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.encontrarActivity()
+    else -> null
+}
+
+private fun abrirConfiguracoesNotificacao(context: Context) {
+    val intent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+        Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
+            putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+        }
+    } else {
+        Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+            data = android.net.Uri.fromParts("package", context.packageName, null)
+        }
+    }.apply {
+        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    }
+    runCatching { context.startActivity(intent) }
 }

@@ -20,7 +20,8 @@ import kotlinx.coroutines.flow.asStateFlow
 class AuthService(
     private val api: SmartParkApi,
     private val sessaoStore: SessaoStore,
-    private val sincronizador: SincronizadorDados
+    private val sincronizador: SincronizadorDados,
+    private val onSessaoAlterada: () -> Unit = {}
 ) {
     private val _sessaoAtual = MutableStateFlow(sessaoStore.carregar()?.sessao)
     val sessaoAtual: StateFlow<UsuarioSessao?> = _sessaoAtual.asStateFlow()
@@ -50,6 +51,7 @@ class AuthService(
         )
         _sessaoAtual.value = tokenResp.sessao
         sincronizador.notificarMudanca()
+        onSessaoAlterada()
         return tokenResp.sessao
     }
 
@@ -72,9 +74,11 @@ class AuthService(
         sessaoStore.limpar()
         _sessaoAtual.value = null
         sincronizador.notificarMudanca()
+        onSessaoAlterada()
     }
 
     fun notificarSessaoExpirada() {
         _sessaoAtual.value = null
+        onSessaoAlterada()
     }
 }

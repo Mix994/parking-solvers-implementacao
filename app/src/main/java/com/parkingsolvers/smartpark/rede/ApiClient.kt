@@ -109,26 +109,13 @@ object ApiClient {
         debug: Boolean,
         onSessaoExpirada: () -> Unit
     ): SmartParkApi {
-        val urlNormalizada = if (baseUrl.endsWith("/")) baseUrl else "$baseUrl/"
+        val urlNormalizada = normalizarBaseUrl(baseUrl)
 
         val logging = HttpLoggingInterceptor().apply {
             level = if (debug) HttpLoggingInterceptor.Level.BASIC else HttpLoggingInterceptor.Level.NONE
         }
 
-        // Cliente dedicado sem authenticator para a chamada síncrona de /auth/refresh.
-        val refreshClient = OkHttpClient.Builder()
-            .connectTimeout(15, TimeUnit.SECONDS)
-            .readTimeout(15, TimeUnit.SECONDS)
-            .writeTimeout(15, TimeUnit.SECONDS)
-            .addInterceptor(logging)
-            .build()
-
-        val refreshApi = Retrofit.Builder()
-            .baseUrl(urlNormalizada)
-            .client(refreshClient)
-            .addConverterFactory(GsonConverterFactory.create())
-            .build()
-            .create(SmartParkApi::class.java)
+        val refreshApi = criarRefreshApi(urlNormalizada, logging)
 
         val client = OkHttpClient.Builder()
             .connectTimeout(15, TimeUnit.SECONDS)
@@ -142,6 +129,50 @@ object ApiClient {
         return Retrofit.Builder()
             .baseUrl(urlNormalizada)
             .client(client)
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
+            .create(SmartParkApi::class.java)
+    }
+
+    /**
+     * Cliente OkHttp dedicado ao stream SSE (/eventos/stream): reutiliza autenticação JWT
+     * e renovação automática de token, com readTimeout compatível com heartbeats de 25s e sem
+     * interceptor de logging para não buferizar eventos.
+     */
+    fun criarClienteSse(
+        baseUrl: String,
+        sessaoStore: SessaoStore,
+        onSessaoExpirada: () -> Unit
+    ): OkHttpClient {
+        val urlNormalizada = normalizarBaseUrl(baseUrl)
+        val refreshApi = criarRefreshApi(urlNormalizada, interceptor = null)
+
+        return OkHttpClient.Builder()
+            .connectTimeout(15, TimeUnit.SECONDS)
+            .readTimeout(70, TimeUnit.SECONDS)
+            .writeTimeout(15, TimeUnit.SECONDS)
+            .addInterceptor(AuthInterceptor(sessaoStore))
+            .authenticator(TokenAuthenticator(sessaoStore, { refreshApi }, onSessaoExpirada))
+            .build()
+    }
+
+    fun normalizarBaseUrl(baseUrl: String): String =
+        if (baseUrl.endsWith("/")) baseUrl else "$baseUrl/"
+
+    private fun criarRefreshApi(
+        urlNormalizada: String,
+        interceptor: Interceptor?
+    ): SmartParkApi {
+        val builder = OkHttpClient.Builder()
+            .connectTimeout(15, TimeUnit.SECONDS)
+            .readTimeout(15, TimeUnit.SECONDS)
+            .writeTimeout(15, TimeUnit.SECONDS)
+        if (interceptor != null) {
+            builder.addInterceptor(interceptor)
+        }
+        return Retrofit.Builder()
+            .baseUrl(urlNormalizada)
+            .client(builder.build())
             .addConverterFactory(GsonConverterFactory.create())
             .build()
             .create(SmartParkApi::class.java)

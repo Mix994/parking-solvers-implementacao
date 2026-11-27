@@ -1,36 +1,49 @@
 package com.parkingsolvers.smartpark.movimentacao.ui
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Login
+import androidx.compose.material.icons.automirrored.filled.Logout
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DirectionsCar
+import androidx.compose.material.icons.filled.NotificationsActive
+import androidx.compose.material.icons.filled.NotificationsOff
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -46,6 +59,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.parkingsolvers.smartpark.compartilhado.util.Formatadores
 import com.parkingsolvers.smartpark.compartilhado.validacao.ValidadorPlaca
@@ -64,29 +78,59 @@ import com.parkingsolvers.smartpark.veiculo.dto.response.ResultadoConsultaPlaca
 import com.parkingsolvers.smartpark.veiculo.dto.response.StatusAutorizacao
 import com.parkingsolvers.smartpark.veiculo.dto.response.VeiculoResponse
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun PortariaScreen(
     viewModel: PortariaViewModel,
+    alertasForaDoAppAtivos: Boolean = false,
+    permissaoNotificacaoConcedida: Boolean = false,
+    onAlternarAlertasForaDoApp: () -> Unit = {},
     onRegistrarComoVisitante: (placa: String) -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val noEstacionamento by viewModel.noEstacionamento.collectAsState()
     val historico by viewModel.historico.collectAsState()
     val correspondencias by viewModel.correspondenciasPlaca.collectAsState()
+    val tempoRealConectado by viewModel.tempoRealConectado.collectAsState()
 
-    LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        item {
-            Spacer(modifier = Modifier.height(8.dp))
-            PageHeader(
-                titulo = "Portaria",
-                subtitulo = "Consulte placas na cancela e controle entradas e saídas de servidores"
-            )
+    Column(modifier = Modifier.fillMaxSize()) {
+        AnimatedVisibility(
+            visible = uiState.avisoTempoReal != null,
+            enter = fadeIn(tween(220, easing = SmartParkMotion.CurvaPadrao)) +
+                expandVertically(tween(220, easing = SmartParkMotion.CurvaPadrao)),
+            exit = fadeOut(tween(180, easing = SmartParkMotion.CurvaPadrao)) +
+                shrinkVertically(tween(180, easing = SmartParkMotion.CurvaPadrao))
+        ) {
+            uiState.avisoTempoReal?.let { aviso ->
+                AvisoTempoRealBanner(
+                    aviso = aviso,
+                    onDispensar = viewModel::dispensarAvisoTempoReal,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
+                )
+            }
         }
+
+        LazyColumn(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            item {
+                Spacer(modifier = Modifier.height(8.dp))
+                PageHeader(
+                    titulo = "Portaria",
+                    subtitulo = "Consulte placas na cancela e controle entradas e saídas de servidores"
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                BarraStatusTempoReal(
+                    conectado = tempoRealConectado,
+                    alertasForaDoAppAtivos = alertasForaDoAppAtivos,
+                    permissaoNotificacaoConcedida = permissaoNotificacaoConcedida,
+                    onAlternarAlertasForaDoApp = onAlternarAlertasForaDoApp
+                )
+            }
 
         item {
             SmartParkCard(modifier = Modifier.fillMaxWidth()) {
@@ -255,6 +299,156 @@ fun PortariaScreen(
         }
 
         item { Spacer(modifier = Modifier.height(16.dp)) }
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun BarraStatusTempoReal(
+    conectado: Boolean,
+    alertasForaDoAppAtivos: Boolean,
+    permissaoNotificacaoConcedida: Boolean,
+    onAlternarAlertasForaDoApp: () -> Unit
+) {
+    val corIndicador by animateColorAsState(
+        targetValue = if (conectado) {
+            MaterialTheme.colorScheme.primary
+        } else {
+            MaterialTheme.colorScheme.outline
+        },
+        animationSpec = tween(220, easing = SmartParkMotion.CurvaPadrao),
+        label = "cor_status_tempo_real"
+    )
+    val alertasLigados = alertasForaDoAppAtivos && permissaoNotificacaoConcedida
+
+    FlowRow(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+        itemVerticalAlignment = Alignment.CenterVertically
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(8.dp)
+                    .background(color = corIndicador, shape = CircleShape)
+            )
+            Text(
+                text = if (conectado) "Tempo real ativo" else "Reconectando...",
+                style = MaterialTheme.typography.labelMedium,
+                color = if (conectado) {
+                    MaterialTheme.colorScheme.primary
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                }
+            )
+        }
+
+        FilterChip(
+            selected = alertasLigados,
+            onClick = onAlternarAlertasForaDoApp,
+            leadingIcon = {
+                Icon(
+                    imageVector = if (alertasLigados) {
+                        Icons.Default.NotificationsActive
+                    } else {
+                        Icons.Default.NotificationsOff
+                    },
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp)
+                )
+            },
+            label = {
+                Text(
+                    text = when {
+                        !permissaoNotificacaoConcedida -> "Ativar alertas fora"
+                        alertasForaDoAppAtivos -> "Alertas fora: ON"
+                        else -> "Alertas fora: OFF"
+                    },
+                    maxLines = 1,
+                    softWrap = false
+                )
+            }
+        )
+    }
+}
+
+@Composable
+private fun AvisoTempoRealBanner(
+    aviso: AvisoTempoReal,
+    onDispensar: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val corFundo = if (aviso.ehEntrada) {
+        MaterialTheme.colorScheme.primaryContainer
+    } else {
+        MaterialTheme.colorScheme.surfaceVariant
+    }
+    val corBorda = if (aviso.ehEntrada) {
+        MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)
+    } else {
+        MaterialTheme.colorScheme.outline.copy(alpha = 0.45f)
+    }
+    val corConteudo = if (aviso.ehEntrada) {
+        MaterialTheme.colorScheme.onPrimaryContainer
+    } else {
+        MaterialTheme.colorScheme.onSurface
+    }
+    val icone = if (aviso.ehEntrada) {
+        Icons.AutoMirrored.Filled.Login
+    } else {
+        Icons.AutoMirrored.Filled.Logout
+    }
+
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        color = corFundo,
+        border = BorderStroke(1.dp, corBorda)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 12.dp, top = 6.dp, bottom = 6.dp, end = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Icon(
+                imageVector = icone,
+                contentDescription = null,
+                tint = corConteudo,
+                modifier = Modifier.size(20.dp)
+            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = aviso.titulo,
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    color = corConteudo,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = aviso.detalhe,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = corConteudo.copy(alpha = 0.85f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            IconButton(onClick = onDispensar) {
+                Icon(
+                    imageVector = Icons.Default.Close,
+                    contentDescription = "Dispensar aviso",
+                    tint = corConteudo,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+        }
     }
 }
 
