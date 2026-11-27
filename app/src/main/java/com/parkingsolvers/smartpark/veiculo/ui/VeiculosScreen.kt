@@ -25,6 +25,7 @@ import androidx.compose.material.icons.automirrored.filled.Accessible
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.DirectionsCar
+import androidx.compose.material.icons.filled.Elderly
 import androidx.compose.material.icons.filled.EvStation
 import androidx.compose.material.icons.filled.LocalParking
 import androidx.compose.material.icons.filled.VerifiedUser
@@ -538,7 +539,8 @@ private fun disponibilidadeParaTipo(
 private fun iconePorTipoVaga(tipo: TipoVaga): ImageVector = when (tipo) {
     TipoVaga.COMUM -> Icons.Default.DirectionsCar
     TipoVaga.CARREGAMENTO_ELETRICO -> Icons.Default.EvStation
-    TipoVaga.EXCLUSIVA_PCD, TipoVaga.EXCLUSIVA_IDOSO -> Icons.AutoMirrored.Filled.Accessible
+    TipoVaga.EXCLUSIVA_PCD -> Icons.AutoMirrored.Filled.Accessible
+    TipoVaga.EXCLUSIVA_IDOSO -> Icons.Default.Elderly
     TipoVaga.EXCLUSIVA_OFICIAL -> Icons.Default.VerifiedUser
 }
 
